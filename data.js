@@ -83,6 +83,7 @@
       { round: 'R22', date: 'Sun Aug 9', time: '7:20pm', opponent: 'St Kilda', venue: 'Marvel', home: false },
       { round: 'R23', date: 'Sun Aug 16', time: '3:15pm', opponent: 'Western Bulldogs', venue: 'Marvel', home: false, played: true },
       { round: 'R24', date: 'Sat Aug 22', time: '1:15pm', opponent: 'Fremantle', venue: 'Marvel', home: true, played: true },
+      { round: 'R25', date: 'Sat Aug 29', time: '7:35pm', opponent: 'Melbourne', venue: 'MCG', home: false, played: true },
     ];
 
 // ------------------- AFL club colours -------------------
@@ -858,6 +859,31 @@
         { name:'Oliver Hollands', rating:2.1, tog:85, k:9,hb:6,d:15,de:66.7,mg:162,i50:0,cp:1,gb:0,m:5,im:0,cm:0,sg:1,g:1,b:0,xs:3.1,xsr:2.9,ga:0,si:3,tk:4,pa:17,ho:0,epc:-2.1,epoc:2.4,ep:1.1,ebu:-0.7},
         { name:'Mitch McGovern', rating:1.3, tog:77, k:8,hb:4,d:12,de:50,mg:242,i50:1,cp:7,gb:4,m:4,im:0,cm:1,sg:3,g:0,b:2,xs:8.2,xsr:-6.2,ga:2,si:7,tk:1,pa:10,ho:0,epc:0,epoc:0.3,ep:7.5,ebu:-4.9},
       ]},
+      R25: { opponent: 'Melbourne', venue: 'MCG', players: [
+        { name:'Jagga Smith', rating:19.9, tog:73, k:12,hb:17,d:29,de:75.9,mg:269,i50:1,cp:15,gb:13,m:2,im:0,cm:0,sg:3,g:2,b:1,xs:12.7,xsr:0.3,ga:0,si:7,tk:2,pa:13,ho:0,epc:7.6,epoc:7.8,ep:9.8,ebu:5.6},
+        { name:'Jacob Weitering', rating:17.5, tog:90, k:12,hb:6,d:18,de:88.9,mg:170,i50:1,cp:8,gb:4,m:12,im:6,cm:3,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:5,tk:2,pa:4,ho:0,epc:0,epoc:17.7,ep:11.7,ebu:0.5},
+        { name:'Ben Ainsworth', rating:16.7, tog:85, k:14,hb:7,d:21,de:81,mg:367,i50:4,cp:6,gb:4,m:8,im:0,cm:0,sg:5,g:3,b:1,xs:18.5,xsr:0.5,ga:1,si:9,tk:0,pa:3,ho:0,epc:0.6,epoc:13.3,ep:5.1,ebu:8.4},
+        { name:'Sam Walsh', rating:14.5, tog:80, k:17,hb:22,d:39,de:71.8,mg:389,i50:5,cp:17,gb:12,m:6,im:0,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:8,tk:3,pa:17,ho:0,epc:6.2,epoc:3.9,ep:9.9,ebu:0.5},
+        { name:'Harry Dean', rating:14.4, tog:85, k:11,hb:9,d:20,de:80,mg:134,i50:0,cp:10,gb:5,m:7,im:2,cm:2,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:2,tk:0,pa:4,ho:0,epc:0,epoc:14,ep:9.8,ebu:-0.6},
+        { name:'Nick Haynes', rating:12.6, tog:76, k:10,hb:9,d:19,de:94.7,mg:349,i50:2,cp:2,gb:1,m:11,im:0,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:4,tk:2,pa:3,ho:0,epc:0,epoc:9.9,ep:2.7,ebu:2.9},
+        { name:'Oliver Florent', rating:11.9, tog:79, k:17,hb:7,d:24,de:66.7,mg:532,i50:4,cp:7,gb:7,m:7,im:2,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:4,tk:2,pa:13,ho:0,epc:-1.3,epoc:9.7,ep:7.6,ebu:3.2},
+        { name:'Harry McKay', rating:10.8, tog:94, k:8,hb:4,d:12,de:83.3,mg:220,i50:1,cp:8,gb:4,m:4,im:0,cm:2,sg:3,g:2,b:1,xs:11.7,xsr:1.3,ga:1,si:5,tk:1,pa:5,ho:0,epc:1.2,epoc:9.6,ep:7.6,ebu:4.3},
+        { name:'Oliver Hollands', rating:9.9, tog:82, k:15,hb:3,d:18,de:77.8,mg:540,i50:7,cp:3,gb:2,m:6,im:0,cm:0,sg:2,g:1,b:0,xs:5.9,xsr:0.1,ga:1,si:5,tk:4,pa:15,ho:0,epc:0,epoc:8.4,ep:2.1,ebu:4.3},
+        { name:'Marc Pittonet', rating:9.8, tog:78, k:5,hb:8,d:13,de:53.8,mg:77,i50:1,cp:8,gb:5,m:1,im:0,cm:0,sg:1,g:0,b:1,xs:3.7,xsr:-2.7,ga:0,si:5,tk:2,pa:9,ho:17,epc:7.5,epoc:-2.6,ep:4.2,ebu:-1.6},
+        { name:'Cooper Lord', rating:8.1, tog:84, k:8,hb:9,d:17,de:58.8,mg:192,i50:2,cp:6,gb:4,m:3,im:0,cm:1,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:4,tk:2,pa:13,ho:0,epc:0.9,epoc:5.9,ep:3.2,ebu:3.6},
+        { name:'Patrick Cripps', rating:7.9, tog:79, k:8,hb:14,d:22,de:68.2,mg:226,i50:3,cp:12,gb:4,m:5,im:1,cm:2,sg:1,g:1,b:0,xs:5.4,xsr:0.6,ga:0,si:3,tk:3,pa:12,ho:0,epc:-2.1,epoc:8.7,ep:9.8,ebu:-0.4},
+        { name:'Matthew Cottrell', rating:6.7, tog:72, k:15,hb:5,d:20,de:65,mg:363,i50:3,cp:7,gb:6,m:3,im:0,cm:0,sg:5,g:0,b:4,xs:15.1,xsr:-11.1,ga:0,si:7,tk:1,pa:9,ho:0,epc:1.3,epoc:3.1,ep:5.5,ebu:-2.3},
+        { name:'Francis Evans', rating:6.1, tog:73, k:5,hb:6,d:11,de:63.6,mg:169,i50:5,cp:6,gb:3,m:1,im:0,cm:0,sg:1,g:0,b:1,xs:2.9,xsr:-1.9,ga:1,si:4,tk:8,pa:22,ho:0,epc:0.5,epoc:3.1,ep:4.7,ebu:-2},
+        { name:'Billy Wilson', rating:5, tog:79, k:10,hb:4,d:14,de:78.6,mg:214,i50:0,cp:2,gb:2,m:0,im:0,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:2,tk:2,pa:10,ho:0,epc:-0.7,epoc:3.6,ep:1,ebu:2.6},
+        { name:'Adam Cerra', rating:4.8, tog:85, k:16,hb:10,d:26,de:88.5,mg:408,i50:1,cp:7,gb:5,m:8,im:1,cm:1,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:6,tk:3,pa:15,ho:0,epc:0.8,epoc:2.5,ep:5.7,ebu:-2.4},
+        { name:'Lewis Young', rating:4.6, tog:59, k:4,hb:5,d:9,de:77.8,mg:63,i50:1,cp:2,gb:2,m:2,im:0,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:3,tk:1,pa:7,ho:3,epc:0.9,epoc:2.2,ep:1.8,ebu:0.2},
+        { name:'George Hewett', rating:4.4, tog:72, k:9,hb:11,d:20,de:80,mg:143,i50:1,cp:4,gb:3,m:2,im:0,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:1,si:3,tk:2,pa:12,ho:0,epc:-0.6,epoc:3.7,ep:2,ebu:1.8},
+        { name:'Lachlan Cowan', rating:3.5, tog:85, k:12,hb:4,d:16,de:56.3,mg:321,i50:1,cp:2,gb:1,m:6,im:1,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:3,tk:3,pa:14,ho:0,epc:0,epoc:1.2,ep:1.5,ebu:-1.4},
+        { name:'Brodie Kemp', rating:2.9, tog:86, k:11,hb:3,d:14,de:64.3,mg:248,i50:2,cp:3,gb:1,m:10,im:0,cm:2,sg:3,g:1,b:2,xs:9.8,xsr:-1.8,ga:1,si:7,tk:1,pa:6,ho:0,epc:0,epoc:2.2,ep:5.2,ebu:-2.9},
+        { name:'Mitch McGovern', rating:1.3, tog:69, k:5,hb:5,d:10,de:70,mg:118,i50:3,cp:5,gb:1,m:4,im:0,cm:2,sg:0,g:0,b:0,xs:0,xsr:0,ga:1,si:1,tk:3,pa:15,ho:0,epc:0,epoc:0.4,ep:4.6,ebu:-1.7},
+        { name:'Talor Byrne', rating:0.4, tog:59, k:3,hb:5,d:8,de:87.5,mg:91,i50:0,cp:2,gb:0,m:3,im:0,cm:0,sg:1,g:0,b:0,xs:1.5,xsr:-1.5,ga:1,si:4,tk:1,pa:14,ho:0,epc:0,epoc:0.5,ep:2.4,ebu:1.3},
+        { name:'Blake Acres', rating:-0.3, tog:73, k:12,hb:5,d:17,de:64.7,mg:305,i50:0,cp:3,gb:3,m:6,im:1,cm:0,sg:3,g:0,b:3,xs:8.1,xsr:-5.1,ga:0,si:7,tk:2,pa:9,ho:0,epc:0,epoc:-1.7,ep:3.2,ebu:-3.7},
+      ]},
     };
 
 // ------------------- Stat categories -------------------
@@ -1220,6 +1246,32 @@
         'Cooper Lord': { rating: 2.3, tog: 82 },
         'Oliver Hollands': { rating: 2.1, tog: 85 },
         'Mitch McGovern': { rating: 1.3, tog: 77 },
+      };
+
+      const CSV_R25 = {
+        'Jagga Smith': { rating: 19.9, tog: 73 },
+        'Jacob Weitering': { rating: 17.5, tog: 90 },
+        'Ben Ainsworth': { rating: 16.7, tog: 85 },
+        'Sam Walsh': { rating: 14.5, tog: 80 },
+        'Harry Dean': { rating: 14.4, tog: 85 },
+        'Nick Haynes': { rating: 12.6, tog: 76 },
+        'Oliver Florent': { rating: 11.9, tog: 79 },
+        'Harry McKay': { rating: 10.8, tog: 94 },
+        'Oliver Hollands': { rating: 9.9, tog: 82 },
+        'Marc Pittonet': { rating: 9.8, tog: 78 },
+        'Cooper Lord': { rating: 8.1, tog: 84 },
+        'Patrick Cripps': { rating: 7.9, tog: 79 },
+        'Matthew Cottrell': { rating: 6.7, tog: 72 },
+        'Francis Evans': { rating: 6.1, tog: 73 },
+        'Billy Wilson': { rating: 5, tog: 79 },
+        'Adam Cerra': { rating: 4.8, tog: 85 },
+        'Lewis Young': { rating: 4.6, tog: 59 },
+        'George Hewett': { rating: 4.4, tog: 72 },
+        'Lachlan Cowan': { rating: 3.5, tog: 85 },
+        'Brodie Kemp': { rating: 2.9, tog: 86 },
+        'Mitch McGovern': { rating: 1.3, tog: 69 },
+        'Talor Byrne': { rating: 0.4, tog: 59 },
+        'Blake Acres': { rating: -0.3, tog: 73 },
       };
 
       const CSV_R16 = {
@@ -1650,7 +1702,12 @@
           const data = CSV_R24[p.name];
           if (data) r24Ratings[p.id] = data;
         });
-        return { OR: orRatings, R1: r1Ratings, R3: r3Ratings, R4: r4Ratings, R5: r5Ratings, R6: r6Ratings, R7: r7Ratings, R8: r8Ratings, R9: r9Ratings, R10: r10Ratings, R11: r11Ratings, R12: r12Ratings, R13: r13Ratings, R15: r15Ratings, R16: r16Ratings, R17: r17Ratings, R18: r18Ratings, R19: r19Ratings, R20: r20Ratings, R21: r21Ratings, R22: r22Ratings, R23: r23Ratings, R24: r24Ratings };
+        const r25Ratings = {};
+        CARLTON_PLAYERS.forEach(p => {
+          const data = CSV_R25[p.name];
+          if (data) r25Ratings[p.id] = data;
+        });
+        return { OR: orRatings, R1: r1Ratings, R3: r3Ratings, R4: r4Ratings, R5: r5Ratings, R6: r6Ratings, R7: r7Ratings, R8: r8Ratings, R9: r9Ratings, R10: r10Ratings, R11: r11Ratings, R12: r12Ratings, R13: r13Ratings, R15: r15Ratings, R16: r16Ratings, R17: r17Ratings, R18: r18Ratings, R19: r19Ratings, R20: r20Ratings, R21: r21Ratings, R22: r22Ratings, R23: r23Ratings, R24: r24Ratings, R25: r25Ratings };
       };
 
 // ------------------- 2026 results + Squiggle name map -------------------
@@ -1680,6 +1737,7 @@
       R22: { for: 106, against: 62,  result: 'W' },
       R23: { for: 82,  against: 82,  result: 'D' },
       R24: { for: 119, against: 82,  result: 'W' },
+      R25: { for: 74,  against: 55,  result: 'W' },
     };
 
     // Squiggle team name -> board opponent name
