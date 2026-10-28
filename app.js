@@ -149,14 +149,20 @@ const ClubLogo = ({
   }));
 };
 const PHOTO_EXTS = ['png', 'jpg', 'webp'];
+// Local copies (players/, from get_photos.py) are for opening the page from disk. Online, the
+// AFL CDN goes first: on the phone the local tries were three 404s per face before every photo.
+const LOCAL_PHOTOS_FIRST = location.protocol === 'file:';
+const deadPhotoSrc = new Set(); // sources that failed once this visit; never retried
+
 const PlayerPhoto = ({
   player,
   size = 36
 }) => {
-  const [srcIdx, setSrcIdx] = useState(0);
-  const sources = player.number == null ? [] : PHOTO_EXTS.map(ext => `players/${numLabel(player)}.${ext}`);
-  if (PLAYER_PHOTOS[player.number]) sources.push(PLAYER_PHOTOS[player.number]);
-  if (srcIdx >= sources.length) {
+  const [, bump] = useState(0);
+  const local = player.number == null ? [] : PHOTO_EXTS.map(ext => `players/${player.number}.${ext}`);
+  const cdn = PLAYER_PHOTOS[player.number] ? [PLAYER_PHOTOS[player.number]] : [];
+  const src = (LOCAL_PHOTOS_FIRST ? [...local, ...cdn] : [...cdn, ...local]).find(s => !deadPhotoSrc.has(s));
+  if (!src) {
     return /*#__PURE__*/React.createElement("div", {
       style: {
         width: size,
@@ -188,9 +194,15 @@ const PlayerPhoto = ({
       overflow: 'hidden'
     }
   }, /*#__PURE__*/React.createElement("img", {
-    src: sources[srcIdx],
+    src: src,
     alt: player.name,
-    onError: () => setSrcIdx(i2 => i2 + 1),
+    loading: "lazy",
+    decoding: "async",
+    draggable: false,
+    onError: () => {
+      deadPhotoSrc.add(src);
+      bump(n => n + 1);
+    },
     style: {
       width: '100%',
       height: '100%',
@@ -5204,22 +5216,60 @@ const unshiftAfterKeyboard = () => setTimeout(() => window.scrollTo(0, 0), 60);
 // the page's scroll area, iPhone Safari hands a swipe that hits the end of the list to the page
 // behind it, so the list feels stuck. Heights are explicit pixels from the visible screen rather
 // than flexbox shrinking, which older Safari gets wrong, so the list always fits above the keyboard.
-// `pinned` stays above the scrolling part (e.g. the picker's search and filters).
+// `pinned` stays above the scrolling part (e.g. the picker's search and filters). Changing
+// `scrollKey` puts the list back at the top. Swipe the top of the sheet down (or tap the
+// backdrop / Done) to close; it slides away rather than vanishing.
 const Sheet = ({
   title,
   onClose,
   children,
-  pinned
+  pinned,
+  scrollKey
 }) => {
   const view = useVisibleViewport();
   const headRef = useRef(null);
+  const bodyRef = useRef(null);
   const [headH, setHeadH] = useState(64);
+  const [drag, setDrag] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const start = useRef(null);
   useLayoutEffect(() => {
     if (headRef.current) setHeadH(headRef.current.offsetHeight);
   });
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
+  }, [scrollKey]);
   const panelMax = Math.max(240, view.height - 44);
+  const close = () => {
+    if (closing) return;
+    setClosing(true);
+    setTimeout(onClose, 200);
+  };
+  const down = e => {
+    if (e.target.closest('input, button, select')) return;
+    start.current = {
+      y: e.clientY,
+      t: performance.now()
+    };
+    setDragging(true);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+  };
+  const move = e => {
+    if (start.current) setDrag(Math.max(0, e.clientY - start.current.y));
+  };
+  const up = e => {
+    if (!start.current) return;
+    const dy = Math.max(0, e.clientY - start.current.y);
+    const speed = dy / Math.max(1, performance.now() - start.current.t);
+    start.current = null;
+    setDragging(false);
+    if (dy > 120 || dy > 50 && speed > 0.8) close();else setDrag(0);
+  };
   return ReactDOM.createPortal( /*#__PURE__*/React.createElement("div", {
-    onClick: onClose,
+    onClick: close,
     style: {
       position: 'fixed',
       left: 0,
@@ -5231,7 +5281,9 @@ const Sheet = ({
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'flex-end',
-      animation: 'fade-in 0.15s ease'
+      animation: 'fade-in 0.15s ease',
+      opacity: closing ? 0 : 1 - Math.min(drag / 500, 0.5),
+      transition: 'opacity 0.2s ease'
     }
   }, /*#__PURE__*/React.createElement("div", {
     onClick: e => e.stopPropagation(),
@@ -5245,12 +5297,20 @@ const Sheet = ({
       border: '1px solid rgba(255,255,255,0.12)',
       borderBottom: 'none',
       boxShadow: '0 -20px 50px rgba(0,0,0,0.5)',
-      animation: 'sheet-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)'
+      animation: 'sheet-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)',
+      transform: closing ? 'translateY(100%)' : `translateY(${drag}px)`,
+      transition: dragging ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)'
     }
   }, /*#__PURE__*/React.createElement("div", {
     ref: headRef,
+    onPointerDown: down,
+    onPointerMove: move,
+    onPointerUp: up,
+    onPointerCancel: up,
     style: {
-      flexShrink: 0
+      flexShrink: 0,
+      touchAction: 'none',
+      cursor: 'grab'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -5279,7 +5339,7 @@ const Sheet = ({
       fontWeight: '800'
     }
   }, title), /*#__PURE__*/React.createElement("button", {
-    onClick: onClose,
+    onClick: close,
     style: {
       padding: '7px 14px',
       borderRadius: '999px',
@@ -5295,6 +5355,7 @@ const Sheet = ({
       padding: '0 16px'
     }
   }, pinned)), /*#__PURE__*/React.createElement("div", {
+    ref: bodyRef,
     style: {
       maxHeight: panelMax - headH,
       overflowY: 'auto',
@@ -5390,15 +5451,28 @@ const SlotTile = ({
 }, "+"));
 
 // Pick a player for one slot. Opens filtered to the slot's line; only unpicked players.
+// When `onSkip` is set the picker is filling empty slots in a row: after each pick the parent
+// hands it the next empty slot, and the filter resets to suit that slot.
+const slotFilter = t => {
+  if (t.bench !== undefined) return 'ALL';
+  if (t.key === 'R') return 'RUCK';
+  return LINE_FILTER[TEAM_LINES.find(l => l.slots.some(s => s.key === t.key)).key];
+};
+const targetKey = t => t.bench !== undefined ? `IC${t.bench}` : t.key;
 const PickerSheet = ({
   target,
   board,
   onPick,
-  onClose
+  onClose,
+  onSkip,
+  picked
 }) => {
-  const line = target.bench !== undefined ? null : TEAM_LINES.find(l => l.slots.some(s => s.key === target.key));
-  const [pos, setPos] = useState(target.key === 'R' ? 'RUCK' : line ? LINE_FILTER[line.key] : 'ALL');
+  const [pos, setPos] = useState(() => slotFilter(target));
   const [query, setQuery] = useState('');
+  useEffect(() => {
+    setPos(slotFilter(target));
+    setQuery('');
+  }, [targetKey(target)]);
   const [byRating, setByRating] = useState(false);
   const ra = useMemo(ratingAverages, []);
   const q = query.trim();
@@ -5406,7 +5480,28 @@ const PickerSheet = ({
   return /*#__PURE__*/React.createElement(Sheet, {
     title: targetLabel(target),
     onClose: onClose,
-    pinned: /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    scrollKey: targetKey(target),
+    pinned: /*#__PURE__*/React.createElement(React.Fragment, null, onSkip && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        margin: '-2px 0 10px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: '12.5px',
+        fontWeight: '600'
+      }
+    }, picked, " of 23 picked • moves to the next empty spot"), /*#__PURE__*/React.createElement("button", {
+      onClick: onSkip,
+      style: {
+        ...chipStyle(false),
+        padding: '6px 12px',
+        fontSize: '12.5px'
+      }
+    }, "Skip ›")), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         gap: '8px',
@@ -5560,6 +5655,21 @@ const MobileTeam = ({
     const n = draft();
     setT(n, t, id);
     commit(n);
+    return n;
+  };
+  // Team-sheet order for filling: B, HB, C, HF, F, FOL, then interchange
+  const ORDER = [...TEAM_SLOTS.map(s => ({
+    key: s.key
+  })), ...[0, 1, 2, 3, 4].map(i => ({
+    bench: i
+  }))];
+  const nextEmpty = (as, after) => {
+    const i = ORDER.findIndex(t => sameTarget(t, after));
+    for (let k = 1; k < ORDER.length; k++) {
+      const t = ORDER[(i + k) % ORDER.length];
+      if (!getT(as, t)) return t;
+    }
+    return null;
   };
   const swap = (from, to) => {
     const n = draft();
@@ -5605,7 +5715,10 @@ const MobileTeam = ({
     if (id) setDetail({
       target: t,
       id
-    });else setPicker(t);
+    });else setPicker({
+      target: t,
+      chain: true
+    });
   };
   const fieldCount = TEAM_SLOTS.filter(s => a.slots[s.key]).length + a.extra.length;
   const benchCount = a.bench.filter(Boolean).length;
@@ -5803,12 +5916,24 @@ const MobileTeam = ({
       margin: '6px 6px 0 0'
     }
   }, playerById(id).name, " ✕"))), picker && /*#__PURE__*/React.createElement(PickerSheet, {
-    target: picker,
+    target: picker.target,
     board: board,
+    picked: selected.length,
     onClose: () => setPicker(null),
+    onSkip: picker.chain ? () => {
+      const nxt = nextEmpty(a, picker.target);
+      setPicker(nxt && !sameTarget(nxt, picker.target) ? {
+        target: nxt,
+        chain: true
+      } : null);
+    } : null,
     onPick: id => {
-      place(picker, id);
-      setPicker(null);
+      const n = place(picker.target, id);
+      const nxt = picker.chain ? nextEmpty(n, picker.target) : null;
+      setPicker(nxt ? {
+        target: nxt,
+        chain: true
+      } : null);
     }
   }), detailPlayer && /*#__PURE__*/React.createElement(Sheet, {
     title: targetLabel(detail.target),
@@ -5830,7 +5955,10 @@ const MobileTeam = ({
     });
     setDetail(null);
   }, false], ['Change', () => {
-    setPicker(detail.target);
+    setPicker({
+      target: detail.target,
+      chain: false
+    });
     setDetail(null);
   }, false], ['Remove', () => {
     remove(detail.target);
@@ -6393,24 +6521,26 @@ function MobileApp({
       fontWeight: '800',
       lineHeight: 1
     }
-  }, "⋯")), /*#__PURE__*/React.createElement("div", {
+  }, "⋯")), [['team', /*#__PURE__*/React.createElement(MobileTeam, {
+    board: board,
+    setBoard: setBoard,
+    votes: votes,
+    showToast: showToast
+  })], ['bf', /*#__PURE__*/React.createElement(MobileVotes, {
+    votes: votes,
+    setVotes: setVotes,
+    ratings: ratings
+  })]].map(([k, el]) => /*#__PURE__*/React.createElement("div", {
+    key: k,
     style: {
       flex: 1,
       minHeight: 0,
       overflowY: 'auto',
       overscrollBehavior: 'contain',
-      WebkitOverflowScrolling: 'touch'
+      WebkitOverflowScrolling: 'touch',
+      display: tab === k ? 'block' : 'none'
     }
-  }, tab === 'team' ? /*#__PURE__*/React.createElement(MobileTeam, {
-    board: board,
-    setBoard: setBoard,
-    votes: votes,
-    showToast: showToast
-  }) : /*#__PURE__*/React.createElement(MobileVotes, {
-    votes: votes,
-    setVotes: setVotes,
-    ratings: ratings
-  })), /*#__PURE__*/React.createElement("div", {
+  }, el)), /*#__PURE__*/React.createElement("div", {
     style: {
       flexShrink: 0,
       display: 'flex',

@@ -82,13 +82,18 @@
     };
 
     const PHOTO_EXTS = ['png', 'jpg', 'webp'];
+    // Local copies (players/, from get_photos.py) are for opening the page from disk. Online, the
+    // AFL CDN goes first: on the phone the local tries were three 404s per face before every photo.
+    const LOCAL_PHOTOS_FIRST = location.protocol === 'file:';
+    const deadPhotoSrc = new Set();   // sources that failed once this visit; never retried
 
     const PlayerPhoto = ({ player, size = 36 }) => {
-      const [srcIdx, setSrcIdx] = useState(0);
-      const sources = player.number == null ? [] : PHOTO_EXTS.map(ext => `players/${numLabel(player)}.${ext}`);
-      if (PLAYER_PHOTOS[player.number]) sources.push(PLAYER_PHOTOS[player.number]);
+      const [, bump] = useState(0);
+      const local = player.number == null ? [] : PHOTO_EXTS.map(ext => `players/${player.number}.${ext}`);
+      const cdn = PLAYER_PHOTOS[player.number] ? [PLAYER_PHOTOS[player.number]] : [];
+      const src = (LOCAL_PHOTOS_FIRST ? [...local, ...cdn] : [...cdn, ...local]).find(s => !deadPhotoSrc.has(s));
 
-      if (srcIdx >= sources.length) {
+      if (!src) {
         return (
           <div style={{
             width: size, height: size, borderRadius: '50%',
@@ -114,9 +119,12 @@
           flexShrink: 0, overflow: 'hidden',
         }}>
           <img
-            src={sources[srcIdx]}
+            src={src}
             alt={player.name}
-            onError={() => setSrcIdx(i2 => i2 + 1)}
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+            onError={() => { deadPhotoSrc.add(src); bump(n => n + 1); }}
             style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center' }}
           />
         </div>
@@ -3299,19 +3307,49 @@
     // the page's scroll area, iPhone Safari hands a swipe that hits the end of the list to the page
     // behind it, so the list feels stuck. Heights are explicit pixels from the visible screen rather
     // than flexbox shrinking, which older Safari gets wrong, so the list always fits above the keyboard.
-    // `pinned` stays above the scrolling part (e.g. the picker's search and filters).
-    const Sheet = ({ title, onClose, children, pinned }) => {
+    // `pinned` stays above the scrolling part (e.g. the picker's search and filters). Changing
+    // `scrollKey` puts the list back at the top. Swipe the top of the sheet down (or tap the
+    // backdrop / Done) to close; it slides away rather than vanishing.
+    const Sheet = ({ title, onClose, children, pinned, scrollKey }) => {
       const view = useVisibleViewport();
       const headRef = useRef(null);
+      const bodyRef = useRef(null);
       const [headH, setHeadH] = useState(64);
+      const [drag, setDrag] = useState(0);
+      const [dragging, setDragging] = useState(false);
+      const [closing, setClosing] = useState(false);
+      const start = useRef(null);
       useLayoutEffect(() => { if (headRef.current) setHeadH(headRef.current.offsetHeight); });
+      useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = 0; }, [scrollKey]);
       const panelMax = Math.max(240, view.height - 44);
 
+      const close = () => {
+        if (closing) return;
+        setClosing(true);
+        setTimeout(onClose, 200);
+      };
+      const down = (e) => {
+        if (e.target.closest('input, button, select')) return;
+        start.current = { y: e.clientY, t: performance.now() };
+        setDragging(true);
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+      };
+      const move = (e) => { if (start.current) setDrag(Math.max(0, e.clientY - start.current.y)); };
+      const up = (e) => {
+        if (!start.current) return;
+        const dy = Math.max(0, e.clientY - start.current.y);
+        const speed = dy / Math.max(1, performance.now() - start.current.t);
+        start.current = null;
+        setDragging(false);
+        if (dy > 120 || (dy > 50 && speed > 0.8)) close(); else setDrag(0);
+      };
+
       return ReactDOM.createPortal(
-        <div onClick={onClose} style={{
+        <div onClick={close} style={{
           position: 'fixed', left: 0, right: 0, top: view.top, height: view.height, zIndex: 4000,
           background: 'rgba(2,6,14,0.6)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
           animation: 'fade-in 0.15s ease',
+          opacity: closing ? 0 : 1 - Math.min(drag / 500, 0.5), transition: 'opacity 0.2s ease',
         }}>
           <div onClick={(e) => e.stopPropagation()} style={{
             maxHeight: panelMax, display: 'flex', flexDirection: 'column', overflow: 'hidden',
@@ -3319,21 +3357,24 @@
             borderRadius: '20px 20px 0 0', border: '1px solid rgba(255,255,255,0.12)', borderBottom: 'none',
             boxShadow: '0 -20px 50px rgba(0,0,0,0.5)',
             animation: 'sheet-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)',
+            transform: closing ? 'translateY(100%)' : `translateY(${drag}px)`,
+            transition: dragging ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
           }}>
-            <div ref={headRef} style={{ flexShrink: 0 }}>
+            <div ref={headRef} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
+              style={{ flexShrink: 0, touchAction: 'none', cursor: 'grab' }}>
               <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '8px' }}>
                 <span style={{ width: '40px', height: '5px', borderRadius: '3px', background: 'rgba(255,255,255,0.22)' }}></span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px 10px' }}>
                 <span style={{ color: '#fff', fontSize: '17px', fontWeight: '800' }}>{title}</span>
-                <button onClick={onClose} style={{
+                <button onClick={close} style={{
                   padding: '7px 14px', borderRadius: '999px', border: 'none', cursor: 'pointer',
                   background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', fontWeight: '700',
                 }}>Done</button>
               </div>
               {pinned && <div style={{ padding: '0 16px' }}>{pinned}</div>}
             </div>
-            <div style={{
+            <div ref={bodyRef} style={{
               maxHeight: panelMax - headH, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
               padding: '0 16px calc(18px + env(safe-area-inset-bottom))',
             }}>
@@ -3381,10 +3422,19 @@
     );
 
     // Pick a player for one slot. Opens filtered to the slot's line; only unpicked players.
-    const PickerSheet = ({ target, board, onPick, onClose }) => {
-      const line = target.bench !== undefined ? null : TEAM_LINES.find(l => l.slots.some(s => s.key === target.key));
-      const [pos, setPos] = useState(target.key === 'R' ? 'RUCK' : line ? LINE_FILTER[line.key] : 'ALL');
+    // When `onSkip` is set the picker is filling empty slots in a row: after each pick the parent
+    // hands it the next empty slot, and the filter resets to suit that slot.
+    const slotFilter = (t) => {
+      if (t.bench !== undefined) return 'ALL';
+      if (t.key === 'R') return 'RUCK';
+      return LINE_FILTER[TEAM_LINES.find(l => l.slots.some(s => s.key === t.key)).key];
+    };
+    const targetKey = (t) => t.bench !== undefined ? `IC${t.bench}` : t.key;
+
+    const PickerSheet = ({ target, board, onPick, onClose, onSkip, picked }) => {
+      const [pos, setPos] = useState(() => slotFilter(target));
       const [query, setQuery] = useState('');
+      useEffect(() => { setPos(slotFilter(target)); setQuery(''); }, [targetKey(target)]);
       const [byRating, setByRating] = useState(false);
       const ra = useMemo(ratingAverages, []);
       const q = query.trim();
@@ -3395,7 +3445,15 @@
         .sort((a, b) => byRating ? (ra.avg[b.name] ?? -99) - (ra.avg[a.name] ?? -99) : a.number - b.number);
 
       return (
-        <Sheet title={targetLabel(target)} onClose={onClose} pinned={<>
+        <Sheet title={targetLabel(target)} onClose={onClose} scrollKey={targetKey(target)} pinned={<>
+          {onSkip && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '-2px 0 10px' }}>
+              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12.5px', fontWeight: '600' }}>
+                {picked} of 23 picked • moves to the next empty spot
+              </span>
+              <button onClick={onSkip} style={{ ...chipStyle(false), padding: '6px 12px', fontSize: '12.5px' }}>Skip ›</button>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
             <input
               value={query}
@@ -3468,7 +3526,17 @@
       const draft = () => ({ slots: { ...a.slots }, bench: [...a.bench], extra: [...a.extra] });
       const commit = (next) => setBoard(prev => boardFromSlots(next, prev));
 
-      const place = (t, id) => { const n = draft(); setT(n, t, id); commit(n); };
+      const place = (t, id) => { const n = draft(); setT(n, t, id); commit(n); return n; };
+      // Team-sheet order for filling: B, HB, C, HF, F, FOL, then interchange
+      const ORDER = [...TEAM_SLOTS.map(s => ({ key: s.key })), ...[0, 1, 2, 3, 4].map(i => ({ bench: i }))];
+      const nextEmpty = (as, after) => {
+        const i = ORDER.findIndex(t => sameTarget(t, after));
+        for (let k = 1; k < ORDER.length; k++) {
+          const t = ORDER[(i + k) % ORDER.length];
+          if (!getT(as, t)) return t;
+        }
+        return null;
+      };
       const swap = (from, to) => { const n = draft(); const x = getT(n, from), y = getT(n, to); setT(n, to, x); setT(n, from, y); commit(n); };
       const remove = (t) => {
         const pl = playerById(getT(a, t));
@@ -3496,7 +3564,7 @@
           return;
         }
         const id = getT(a, t);
-        if (id) setDetail({ target: t, id }); else setPicker(t);
+        if (id) setDetail({ target: t, id }); else setPicker({ target: t, chain: true });
       };
 
       const fieldCount = TEAM_SLOTS.filter(s => a.slots[s.key]).length + a.extra.length;
@@ -3596,10 +3664,19 @@
 
           {picker && (
             <PickerSheet
-              target={picker}
+              target={picker.target}
               board={board}
+              picked={selected.length}
               onClose={() => setPicker(null)}
-              onPick={(id) => { place(picker, id); setPicker(null); }}
+              onSkip={picker.chain ? () => {
+                const nxt = nextEmpty(a, picker.target);
+                setPicker(nxt && !sameTarget(nxt, picker.target) ? { target: nxt, chain: true } : null);
+              } : null}
+              onPick={(id) => {
+                const n = place(picker.target, id);
+                const nxt = picker.chain ? nextEmpty(n, picker.target) : null;
+                setPicker(nxt ? { target: nxt, chain: true } : null);
+              }}
             />
           )}
 
@@ -3609,7 +3686,7 @@
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '18px' }}>
                 {[
                   ['Move', () => { setMoving({ target: detail.target, id: detail.id }); setDetail(null); }, false],
-                  ['Change', () => { setPicker(detail.target); setDetail(null); }, false],
+                  ['Change', () => { setPicker({ target: detail.target, chain: false }); setDetail(null); }, false],
                   ['Remove', () => { remove(detail.target); setDetail(null); }, true],
                 ].map(([label, fn, red]) => (
                   <button key={label} onClick={fn} style={{
@@ -3885,11 +3962,16 @@
             }}>⋯</button>
           </div>
 
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}>
-            {tab === 'team'
-              ? <MobileTeam board={board} setBoard={setBoard} votes={votes} showToast={showToast} />
-              : <MobileVotes votes={votes} setVotes={setVotes} ratings={ratings} />}
-          </div>
+          {/* Both tabs stay mounted, each with its own scroll area, so switching keeps your place */}
+          {[['team', <MobileTeam board={board} setBoard={setBoard} votes={votes} showToast={showToast} />],
+            ['bf', <MobileVotes votes={votes} setVotes={setVotes} ratings={ratings} />]].map(([k, el]) => (
+            <div key={k} style={{
+              flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
+              display: tab === k ? 'block' : 'none',
+            }}>
+              {el}
+            </div>
+          ))}
 
           <div style={{
             flexShrink: 0, display: 'flex',
