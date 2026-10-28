@@ -7,53 +7,56 @@
 // ============================================================
 
 // ------------------- CARLTON_PLAYERS (46-man 2026 list) -------------------
+    // Numbers, heights, DOBs and aflId (Champion Data id, = photo id) checked against the official
+    // AFL squad API on 27 Oct 2026: aflapi.afl.com.au/afl/v2/squads?teamId=5&compSeasonId=85.
+    // Positions are the board's own DEF/MID/RUCK/FWD call, cross-checked with 2026 match roles.
     const CARLTON_PLAYERS = [
-      { id: 1, number: 9, name: 'Patrick Cripps', height: 195, dob: '1995-03-18', position: 'MID', captain: true, aflId: 'CD_M270001' },
-      { id: 2, number: 18, name: 'Sam Walsh', height: 184, dob: '2000-07-02', position: 'MID', aflId: 'CD_M298628' },
-      { id: 3, number: 23, name: 'Jacob Weitering', height: 195, dob: '1997-11-23', position: 'DEF', aflId: 'CD_M292988' },
-      { id: 4, number: 10, name: 'Harry McKay', height: 200, dob: '1997-12-24', position: 'FWD', aflId: 'CD_M297085' },
-      { id: 5, number: 29, name: 'George Hewett', height: 184, dob: '1995-12-29', position: 'MID', aflId: 'CD_M293296' },
-      { id: 6, number: 2, name: 'Lachlan Cowan', height: 189, dob: '2003-04-18', position: 'DEF', aflId: 'CD_M2022103' },
-      { id: 7, number: 4, name: 'Oliver Hollands', height: 184, dob: '2004-01-16', position: 'DEF', aflId: 'CD_M2022102' },
-      { id: 8, number: 11, name: 'Mitch McGovern', height: 191, dob: '1994-10-11', position: 'DEF', aflId: 'CD_M293252' },
-      { id: 9, number: 15, name: 'Billy Wilson', height: 186, dob: '2004-03-22', position: 'DEF', aflId: 'CD_M2024121' },
-      { id: 10, number: 22, name: "Harry O'Farrell", height: 193, dob: '2003-09-05', position: 'DEF', aflId: 'CD_M2023115' },
-      { id: 11, number: 24, name: 'Nic Newman', height: 184, dob: '1993-01-15', position: 'DEF', aflId: 'CD_M270296' },
-      { id: 12, number: 26, name: 'Nick Haynes', height: 195, dob: '1992-05-18', position: 'DEF', aflId: 'CD_M291789' },
-      { id: 13, number: 28, name: 'Harry Charleson', height: 186, dob: '2004-09-11', position: 'DEF', aflId: 'CD_M2024122' },
-      { id: 14, number: 32, name: 'Matthew Carroll', height: 183, dob: '2003-02-09', position: 'DEF', aflId: 'CD_M2023116' },
-      { id: 15, number: 33, name: 'Lewis Young', height: 193, dob: '1998-12-20', position: 'DEF', aflId: 'CD_M998007' },
-      { id: 16, number: 34, name: 'Rob Monahan', height: 188, dob: '2005-07-30', position: 'DEF', aflId: 'CD_M2025101' },
-      { id: 17, number: 35, name: 'Harry Dean', height: 194, dob: '2006-11-05', position: 'DEF', aflId: 'CD_M2026101' },
-      { id: 18, number: 37, name: 'Jordan Boyd', height: 195, dob: '2004-12-01', position: 'DEF', aflId: 'CD_M2024123' },
-      { id: 19, number: 41, name: 'Matt Duffy', height: 196, dob: '2004-05-18', position: 'DEF', aflId: 'CD_M2024124' },
-      { id: 20, number: 42, name: 'Adam Saad', height: 183, dob: '1994-07-23', position: 'DEF', aflId: 'CD_M293305' },
-      { id: 21, number: 5, name: 'Adam Cerra', height: 183, dob: '1999-10-07', position: 'MID', aflId: 'CD_M298008' },
-      { id: 22, number: 7, name: 'Jagga Smith', height: 182, dob: '2006-01-28', position: 'MID', aflId: 'CD_M2024125' },
-      { id: 23, number: 13, name: 'Blake Acres', height: 190, dob: '1995-10-07', position: 'MID', aflId: 'CD_M291790' },
-      { id: 24, number: 14, name: 'Oliver Florent', height: 178, dob: '1998-07-22', position: 'MID',  aflId: 'CD_M297063' },
-      { id: 25, number: 16, name: 'Ben Camporeale', height: 180, dob: '2005-04-12', position: 'MID', aflId: 'CD_M2025102' },
-      { id: 26, number: 21, name: 'Lucas Camporeale', height: 182, dob: '2004-08-19', position: 'MID', aflId: 'CD_M2024126' },
-      { id: 27, number: 30, name: 'Jack Ison', height: 181, dob: '2005-02-14', position: 'MID', aflId: 'CD_M2025103' },
-      { id: 28, number: 31, name: 'Campbell Chesser', height: 186, dob: '2003-04-27', position: 'MID',  aflId: 'CD_M2022101' },
-      { id: 29, number: 36, name: 'Cooper Lord', height: 186, dob: '2005-03-20', position: 'MID', aflId: 'CD_M2024127' },
-      { id: 30, number: 46, name: 'Matthew Cottrell', height: 181, dob: '2000-02-29', position: 'MID', aflId: 'CD_M2020101' },
-      { id: 31, number: 25, name: 'Liam Reidy', height: 204, dob: '2000-06-14', position: 'RUCK',  aflId: 'CD_M298100' },
-      { id: 32, number: 27, name: 'Marc Pittonet', height: 202, dob: '1996-06-03', position: 'RUCK', aflId: 'CD_M291994' },
-      { id: 33, number: 3, name: 'Jesse Motlop', height: 176, dob: '2003-11-23', position: 'FWD', aflId: 'CD_M2022104' },
-      { id: 34, number: 6, name: 'Zac Williams', height: 183, dob: '1994-09-20', position: 'FWD', aflId: 'CD_M291741' },
-      { id: 35, number: 8, name: 'Lachie Fogarty', height: 180, dob: '1999-04-01', position: 'FWD', aflId: 'CD_M298084' },
-      { id: 36, number: 12, name: 'Ben Ainsworth', height: 181, dob: '1998-02-10', position: 'FWD',  aflId: 'CD_M297062' },
-      { id: 37, number: 17, name: 'Brodie Kemp', height: 192, dob: '2001-05-01', position: 'FWD', aflId: 'CD_M2020102' },
-      { id: 38, number: 19, name: 'Will Hayward', height: 185, dob: '1998-10-26', position: 'FWD',  aflId: 'CD_M297064' },
-      { id: 39, number: 39, name: 'Talor Byrne', height: 178, dob: '2005-06-20', position: 'FWD', aflId: 'CD_M2025104' },
-      { id: 40, number: 40, name: "Hudson O'Keeffe", height: 197, dob: '2004-05-12', position: 'FWD', aflId: 'CD_M2024128' },
-      { id: 41, number: 43, name: 'Ashton Moir', height: 185, dob: '2004-06-03', position: 'FWD', aflId: 'CD_M2024129' },
-      { id: 42, number: 44, name: 'Francis Evans', height: 184, dob: '2005-01-19', position: 'FWD', aflId: 'CD_M2024130' },
-      { id: 43, number: 45, name: 'Flynn Young', height: 181, dob: '2005-04-25', position: 'FWD', aflId: 'CD_M2025105' },
-      { id: 44, number: 20, name: 'Elijah Hollands', height: 183, dob: '2002-09-18', position: 'MID', aflId: 'CD_M2022105' },
-      { id: 45, number: 47, name: 'Wade Derksen', height: 190, dob: '2001-03-14', position: 'DEF', aflId: 'CD_M2026102' },
-      { id: 46, number: 38, name: 'Flynn Riley', height: 206, dob: '2004-04-05', position: 'RUCK', aflId: 'CD_M2026103' },
+      { id: 1, number: 9, name: 'Patrick Cripps', height: 195, dob: '1995-03-18', position: 'MID', captain: true, aflId: 'CD_I990704' },
+      { id: 2, number: 18, name: 'Sam Walsh', height: 184, dob: '2000-07-02', position: 'MID', aflId: 'CD_I1006094' },
+      { id: 3, number: 23, name: 'Jacob Weitering', height: 195, dob: '1997-11-23', position: 'DEF', aflId: 'CD_I993832' },
+      { id: 4, number: 10, name: 'Harry McKay', height: 200, dob: '1997-12-24', position: 'FWD', aflId: 'CD_I1000953' },
+      { id: 5, number: 29, name: 'George Hewett', height: 187, dob: '1995-12-29', position: 'MID', aflId: 'CD_I294036' },
+      { id: 6, number: 2, name: 'Lachlan Cowan', height: 188, dob: '2004-12-01', position: 'DEF', aflId: 'CD_I1021353' },
+      { id: 7, number: 4, name: 'Oliver Hollands', height: 184, dob: '2004-01-16', position: 'DEF', aflId: 'CD_I1023495' },
+      { id: 8, number: 11, name: 'Mitch McGovern', height: 190, dob: '1994-10-11', position: 'FWD', aflId: 'CD_I297255' },
+      { id: 9, number: 15, name: 'Billy Wilson', height: 183, dob: '2005-06-16', position: 'DEF', aflId: 'CD_I1027678' },
+      { id: 10, number: 22, name: "Harry O'Farrell", height: 197, dob: '2006-05-03', position: 'DEF', aflId: 'CD_I1028526' },
+      { id: 11, number: 24, name: 'Nic Newman', height: 186, dob: '1993-01-15', position: 'DEF', aflId: 'CD_I297907' },
+      { id: 12, number: 26, name: 'Nick Haynes', height: 192, dob: '1992-05-18', position: 'DEF', aflId: 'CD_I295265' },
+      { id: 13, number: 28, name: 'Harry Charleson', height: 182, dob: '2006-06-26', position: 'DEF', aflId: 'CD_I1028496' },
+      { id: 14, number: 32, name: 'Matthew Carroll', height: 190, dob: '2005-11-28', position: 'MID', aflId: 'CD_I1027964' },
+      { id: 15, number: 33, name: 'Lewis Young', height: 202, dob: '1998-12-20', position: 'DEF', aflId: 'CD_I997316' },
+      { id: 16, number: 34, name: 'Rob Monahan', height: 189, dob: '2004-06-29', position: 'DEF', aflId: 'CD_I1035129' },
+      { id: 17, number: 35, name: 'Harry Dean', height: 193, dob: '2007-11-13', position: 'DEF', aflId: 'CD_I1033084' },
+      { id: 18, number: 37, name: 'Jordan Boyd', height: 182, dob: '1998-09-22', position: 'DEF', aflId: 'CD_I1002795' },
+      { id: 19, number: 41, name: 'Matt Duffy', height: 194, dob: '2004-01-02', position: 'DEF', aflId: 'CD_I1039720' },
+      { id: 20, number: 42, name: 'Adam Saad', height: 178, dob: '1994-07-23', position: 'DEF', aflId: 'CD_I295461' },
+      { id: 21, number: 5, name: 'Adam Cerra', height: 188, dob: '1999-10-07', position: 'MID', aflId: 'CD_I1002239' },
+      { id: 22, number: 7, name: 'Jagga Smith', height: 182, dob: '2006-01-28', position: 'MID', aflId: 'CD_I1028515' },
+      { id: 23, number: 13, name: 'Blake Acres', height: 193, dob: '1995-10-07', position: 'MID', aflId: 'CD_I296294' },
+      { id: 24, number: 14, name: 'Oliver Florent', height: 184, dob: '1998-07-22', position: 'DEF',  aflId: 'CD_I998103' },
+      { id: 25, number: 16, name: 'Ben Camporeale', height: 186, dob: '2006-07-21', position: 'MID', aflId: 'CD_I1027282' },
+      { id: 26, number: 21, name: 'Lucas Camporeale', height: 184, dob: '2006-07-21', position: 'MID', aflId: 'CD_I1022452' },
+      { id: 27, number: 30, name: 'Jack Ison', height: 190, dob: '2007-03-26', position: 'FWD', aflId: 'CD_I1033066' },
+      { id: 28, number: 31, name: 'Campbell Chesser', height: 186, dob: '2003-04-27', position: 'MID',  aflId: 'CD_I1017057' },
+      { id: 29, number: 36, name: 'Cooper Lord', height: 184, dob: '2005-03-20', position: 'MID', aflId: 'CD_I1032108' },
+      { id: 30, number: 46, name: 'Matthew Cottrell', height: 184, dob: '2000-02-29', position: 'FWD', aflId: 'CD_I1008154' },
+      { id: 31, number: 25, name: 'Liam Reidy', height: 204, dob: '2000-06-14', position: 'RUCK',  aflId: 'CD_I1023346' },
+      { id: 32, number: 27, name: 'Marc Pittonet', height: 202, dob: '1996-06-03', position: 'RUCK', aflId: 'CD_I298290' },
+      { id: 33, number: 3, name: 'Jesse Motlop', height: 180, dob: '2003-11-23', position: 'FWD', aflId: 'CD_I1017700' },
+      { id: 34, number: 6, name: 'Zac Williams', height: 186, dob: '1994-09-20', position: 'DEF', aflId: 'CD_I294685' },
+      { id: 35, number: 8, name: 'Lachie Fogarty', height: 180, dob: '1999-04-01', position: 'FWD', aflId: 'CD_I1002228' },
+      { id: 36, number: 12, name: 'Ben Ainsworth', height: 178, dob: '1998-02-10', position: 'FWD',  aflId: 'CD_I998130' },
+      { id: 37, number: 17, name: 'Brodie Kemp', height: 192, dob: '2001-05-01', position: 'FWD', aflId: 'CD_I1009241' },
+      { id: 38, number: 19, name: 'Will Hayward', height: 186, dob: '1998-10-26', position: 'FWD',  aflId: 'CD_I997100' },
+      { id: 39, number: 39, name: 'Talor Byrne', height: 174, dob: '2007-11-14', position: 'FWD', aflId: 'CD_I1036426' },
+      { id: 40, number: 40, name: "Hudson O'Keeffe", height: 202, dob: '2004-12-16', position: 'RUCK', aflId: 'CD_I1023489' },
+      { id: 41, number: 43, name: 'Ashton Moir', height: 188, dob: '2005-04-15', position: 'FWD', aflId: 'CD_I1020097' },
+      { id: 42, number: 44, name: 'Francis Evans', height: 182, dob: '2001-08-23', position: 'FWD', aflId: 'CD_I1017255' },
+      { id: 43, number: 45, name: 'Flynn Young', height: 181, dob: '2002-02-03', position: 'FWD', aflId: 'CD_I1020877' },
+      { id: 44, number: 20, name: 'Elijah Hollands', height: 189, dob: '2002-04-25', position: 'MID', aflId: 'CD_I1012862' },
+      { id: 45, number: 47, name: 'Wade Derksen', height: 195, dob: '2001-06-18', position: 'DEF', aflId: 'CD_I1016140' },
+      { id: 46, number: 38, name: 'Flynn Riley', height: 209, dob: '2004-04-05', position: 'RUCK', aflId: 'CD_I1027903' },
     ];
 
 // ------------------- FIXTURE_2026 -------------------
@@ -84,6 +87,7 @@
       { round: 'R23', date: 'Sun Aug 16', time: '3:15pm', opponent: 'Western Bulldogs', venue: 'Marvel', home: false, played: true },
       { round: 'R24', date: 'Sat Aug 22', time: '1:15pm', opponent: 'Fremantle', venue: 'Marvel', home: true, played: true },
       { round: 'R25', date: 'Sat Aug 29', time: '7:35pm', opponent: 'Melbourne', venue: 'MCG', home: false, played: true },
+      { round: 'R26', date: 'Fri Sep 4', time: '7:40pm', opponent: 'Geelong', venue: 'MCG', home: false, tag: 'Elimination Final', played: true },
     ];
 
 // ------------------- AFL club colours -------------------
@@ -884,6 +888,31 @@
         { name:'Talor Byrne', rating:0.4, tog:59, k:3,hb:5,d:8,de:87.5,mg:91,i50:0,cp:2,gb:0,m:3,im:0,cm:0,sg:1,g:0,b:0,xs:1.5,xsr:-1.5,ga:1,si:4,tk:1,pa:14,ho:0,epc:0,epoc:0.5,ep:2.4,ebu:1.3},
         { name:'Blake Acres', rating:-0.3, tog:73, k:12,hb:5,d:17,de:64.7,mg:305,i50:0,cp:3,gb:3,m:6,im:1,cm:0,sg:3,g:0,b:3,xs:8.1,xsr:-5.1,ga:0,si:7,tk:2,pa:9,ho:0,epc:0,epoc:-1.7,ep:3.2,ebu:-3.7},
       ]},
+      R26: { opponent: 'Geelong', venue: 'MCG', players: [
+        { name:'Francis Evans', rating:15.9, tog:82, k:9,hb:2,d:11,de:90.9,mg:295,i50:4,cp:5,gb:2,m:2,im:0,cm:0,sg:3,g:2,b:0,xs:10.4,xsr:1.6,ga:2,si:8,tk:4,pa:12,ho:0,epc:0,epoc:14.4,ep:4.7,ebu:10.1},
+        { name:'Patrick Cripps', rating:15.5, tog:81, k:12,hb:12,d:24,de:58.3,mg:279,i50:3,cp:13,gb:8,m:1,im:0,cm:0,sg:1,g:1,b:0,xs:1.7,xsr:4.3,ga:0,si:6,tk:2,pa:12,ho:0,epc:5.1,epoc:6.6,ep:5.5,ebu:8},
+        { name:'Oliver Florent', rating:14.5, tog:83, k:14,hb:9,d:23,de:91.3,mg:408,i50:1,cp:4,gb:3,m:7,im:1,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:3,tk:5,pa:14,ho:0,epc:2,epoc:11.1,ep:3.4,ebu:8.9},
+        { name:'Marc Pittonet', rating:14.4, tog:72, k:7,hb:6,d:13,de:61.5,mg:165,i50:1,cp:7,gb:2,m:0,im:0,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:4,tk:1,pa:10,ho:30,epc:7.6,epoc:2.7,ep:4.5,ebu:2.7},
+        { name:'Adam Cerra', rating:12.5, tog:82, k:20,hb:3,d:23,de:87,mg:707,i50:3,cp:3,gb:2,m:3,im:0,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:1,si:5,tk:7,pa:22,ho:0,epc:0.7,epoc:9.1,ep:2,ebu:8},
+        { name:'Billy Wilson', rating:12.1, tog:84, k:17,hb:9,d:26,de:76.9,mg:536,i50:2,cp:7,gb:6,m:5,im:0,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:4,tk:3,pa:16,ho:0,epc:2.5,epoc:5.5,ep:5.3,ebu:2.6},
+        { name:'Sam Walsh', rating:11.3, tog:78, k:12,hb:17,d:29,de:55.2,mg:485,i50:7,cp:11,gb:10,m:4,im:1,cm:0,sg:1,g:0,b:1,xs:3.1,xsr:-2.1,ga:1,si:7,tk:5,pa:16,ho:0,epc:3.8,epoc:5.1,ep:7.3,ebu:1.8},
+        { name:'Lachlan Cowan', rating:10.1, tog:95, k:9,hb:7,d:16,de:81.3,mg:316,i50:1,cp:5,gb:4,m:3,im:1,cm:1,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:2,tk:3,pa:13,ho:0,epc:0.8,epoc:6.1,ep:3.3,ebu:1.4},
+        { name:'George Hewett', rating:9.8, tog:76, k:14,hb:13,d:27,de:55.6,mg:353,i50:4,cp:12,gb:8,m:1,im:0,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:1,si:6,tk:11,pa:20,ho:0,epc:2.9,epoc:4.5,ep:7.4,ebu:-0.2},
+        { name:'Jacob Weitering', rating:9.8, tog:83, k:9,hb:3,d:12,de:83.3,mg:290,i50:0,cp:2,gb:1,m:3,im:2,cm:1,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:3,tk:0,pa:4,ho:0,epc:0,epoc:10.4,ep:3.4,ebu:1.9},
+        { name:'Harry McKay', rating:9, tog:85, k:4,hb:7,d:11,de:90.9,mg:120,i50:2,cp:5,gb:4,m:3,im:0,cm:0,sg:1,g:1,b:0,xs:4.5,xsr:1.5,ga:0,si:5,tk:3,pa:6,ho:0,epc:0,epoc:4.5,ep:3.7,ebu:1},
+        { name:'Ben Ainsworth', rating:7.5, tog:74, k:11,hb:8,d:19,de:68.4,mg:284,i50:2,cp:4,gb:3,m:3,im:0,cm:0,sg:3,g:1,b:2,xs:9.6,xsr:-1.6,ga:1,si:8,tk:1,pa:9,ho:0,epc:1.7,epoc:4.6,ep:2.6,ebu:3.7},
+        { name:'Matthew Cottrell', rating:6.5, tog:78, k:8,hb:1,d:9,de:55.6,mg:260,i50:2,cp:3,gb:2,m:4,im:0,cm:1,sg:2,g:1,b:1,xs:7.5,xsr:-0.5,ga:0,si:3,tk:2,pa:11,ho:0,epc:0,epoc:4.8,ep:3.5,ebu:1.1},
+        { name:'Wade Derksen', rating:6.4, tog:84, k:6,hb:5,d:11,de:72.7,mg:154,i50:0,cp:6,gb:4,m:2,im:1,cm:1,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:3,tk:1,pa:7,ho:0,epc:0.7,epoc:6.5,ep:5.9,ebu:-1},
+        { name:'Oliver Hollands', rating:6.1, tog:76, k:10,hb:9,d:19,de:63.2,mg:301,i50:2,cp:4,gb:2,m:6,im:1,cm:0,sg:1,g:1,b:0,xs:4.4,xsr:1.6,ga:0,si:4,tk:6,pa:18,ho:0,epc:-1.5,epoc:3,ep:3.6,ebu:-1.2},
+        { name:'Jagga Smith', rating:6, tog:74, k:7,hb:14,d:21,de:76.2,mg:130,i50:2,cp:7,gb:6,m:3,im:0,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:5,tk:2,pa:10,ho:0,epc:2.6,epoc:-0.2,ep:1.9,ebu:0.5},
+        { name:'Cooper Lord', rating:5.5, tog:75, k:9,hb:10,d:19,de:52.6,mg:330,i50:2,cp:7,gb:5,m:5,im:0,cm:0,sg:2,g:2,b:0,xs:6.7,xsr:5.3,ga:0,si:7,tk:7,pa:23,ho:0,epc:0.2,epoc:2.5,ep:4.8,ebu:1},
+        { name:'Blake Acres', rating:4.9, tog:76, k:7,hb:7,d:14,de:50,mg:294,i50:3,cp:5,gb:4,m:3,im:0,cm:0,sg:2,g:0,b:2,xs:6.8,xsr:-4.8,ga:0,si:5,tk:0,pa:7,ho:0,epc:1.2,epoc:2,ep:4.1,ebu:-2.8},
+        { name:'Talor Byrne', rating:3.5, tog:70, k:1,hb:5,d:6,de:66.7,mg:27,i50:0,cp:3,gb:3,m:1,im:0,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:1,si:5,tk:1,pa:17,ho:0,epc:0,epoc:0.6,ep:1.9,ebu:-0.7},
+        { name:'Harry Dean', rating:2.4, tog:65, k:2,hb:3,d:5,de:80,mg:54,i50:0,cp:0,gb:0,m:3,im:1,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:0,tk:0,pa:5,ho:0,epc:0,epoc:1.6,ep:0.6,ebu:-0.2},
+        { name:'Brodie Kemp', rating:0.9, tog:88, k:6,hb:2,d:8,de:50,mg:114,i50:2,cp:3,gb:1,m:4,im:0,cm:1,sg:4,g:2,b:1,xs:15.6,xsr:-2.6,ga:0,si:6,tk:0,pa:6,ho:0,epc:0,epoc:0.1,ep:3.1,ebu:-1.6},
+        { name:'Mitch McGovern', rating:-0.1, tog:74, k:2,hb:1,d:3,de:66.7,mg:66,i50:1,cp:1,gb:1,m:2,im:0,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:1,si:2,tk:1,pa:13,ho:0,epc:0,epoc:0.6,ep:1.7,ebu:0.1},
+        { name:'Lewis Young', rating:-0.3, tog:67, k:3,hb:4,d:7,de:42.9,mg:71,i50:1,cp:5,gb:4,m:1,im:0,cm:0,sg:0,g:0,b:0,xs:0,xsr:0,ga:0,si:2,tk:0,pa:3,ho:7,epc:0.8,epoc:-1.4,ep:2.9,ebu:-2.1},
+      ]},
     };
 
 // ------------------- Stat categories -------------------
@@ -1272,6 +1301,32 @@
         'Mitch McGovern': { rating: 1.3, tog: 69 },
         'Talor Byrne': { rating: 0.4, tog: 59 },
         'Blake Acres': { rating: -0.3, tog: 73 },
+      };
+
+      const CSV_R26 = {
+        'Francis Evans': { rating: 15.9, tog: 82 },
+        'Patrick Cripps': { rating: 15.5, tog: 81 },
+        'Oliver Florent': { rating: 14.5, tog: 83 },
+        'Marc Pittonet': { rating: 14.4, tog: 72 },
+        'Adam Cerra': { rating: 12.5, tog: 82 },
+        'Billy Wilson': { rating: 12.1, tog: 84 },
+        'Sam Walsh': { rating: 11.3, tog: 78 },
+        'Lachlan Cowan': { rating: 10.1, tog: 95 },
+        'George Hewett': { rating: 9.8, tog: 76 },
+        'Jacob Weitering': { rating: 9.8, tog: 83 },
+        'Harry McKay': { rating: 9, tog: 85 },
+        'Ben Ainsworth': { rating: 7.5, tog: 74 },
+        'Matthew Cottrell': { rating: 6.5, tog: 78 },
+        'Wade Derksen': { rating: 6.4, tog: 84 },
+        'Oliver Hollands': { rating: 6.1, tog: 76 },
+        'Jagga Smith': { rating: 6, tog: 74 },
+        'Cooper Lord': { rating: 5.5, tog: 75 },
+        'Blake Acres': { rating: 4.9, tog: 76 },
+        'Talor Byrne': { rating: 3.5, tog: 70 },
+        'Harry Dean': { rating: 2.4, tog: 65 },
+        'Brodie Kemp': { rating: 0.9, tog: 88 },
+        'Mitch McGovern': { rating: -0.1, tog: 74 },
+        'Lewis Young': { rating: -0.3, tog: 67 },
       };
 
       const CSV_R16 = {
@@ -1707,7 +1762,12 @@
           const data = CSV_R25[p.name];
           if (data) r25Ratings[p.id] = data;
         });
-        return { OR: orRatings, R1: r1Ratings, R3: r3Ratings, R4: r4Ratings, R5: r5Ratings, R6: r6Ratings, R7: r7Ratings, R8: r8Ratings, R9: r9Ratings, R10: r10Ratings, R11: r11Ratings, R12: r12Ratings, R13: r13Ratings, R15: r15Ratings, R16: r16Ratings, R17: r17Ratings, R18: r18Ratings, R19: r19Ratings, R20: r20Ratings, R21: r21Ratings, R22: r22Ratings, R23: r23Ratings, R24: r24Ratings, R25: r25Ratings };
+        const r26Ratings = {};
+        CARLTON_PLAYERS.forEach(p => {
+          const data = CSV_R26[p.name];
+          if (data) r26Ratings[p.id] = data;
+        });
+        return { OR: orRatings, R1: r1Ratings, R3: r3Ratings, R4: r4Ratings, R5: r5Ratings, R6: r6Ratings, R7: r7Ratings, R8: r8Ratings, R9: r9Ratings, R10: r10Ratings, R11: r11Ratings, R12: r12Ratings, R13: r13Ratings, R15: r15Ratings, R16: r16Ratings, R17: r17Ratings, R18: r18Ratings, R19: r19Ratings, R20: r20Ratings, R21: r21Ratings, R22: r22Ratings, R23: r23Ratings, R24: r24Ratings, R25: r25Ratings, R26: r26Ratings };
       };
 
 // ------------------- 2026 results + Squiggle name map -------------------
@@ -1738,10 +1798,67 @@
       R23: { for: 82,  against: 82,  result: 'D' },
       R24: { for: 119, against: 82,  result: 'W' },
       R25: { for: 74,  against: 55,  result: 'W' },
+      R26: { for: 74,  against: 107, result: 'L' },
     };
 
     // Squiggle team name -> board opponent name
     const SQUIGGLE_NAMES = {
       'Greater Western Sydney': 'GWS',
       'Brisbane Lions': 'Brisbane',
+    };
+
+// =====================================================================
+// 2027 SEASON
+// =====================================================================
+// List changes since the end of 2026 (as at 15 Oct 2026, end of trade period).
+// Sources: carltonfc.com.au list-change announcements (9-10 Sep), Zero Hanger
+// (Saad, 5 Oct), Carlton trade hub (Amartey, O'Keeffe, Riley, Whitfield).
+// To add a move: put the player's exact 2026 name in `out`, or add a full
+// player record to `in`. The 2027 list below is derived automatically.
+    const LIST_CHANGES_2027 = {
+      asAt: '15 Oct 2026',
+      out: [
+        { name: 'Zac Williams',     how: 'Delisted', date: '9 Sep' },
+        { name: 'Jordan Boyd',      how: 'Delisted', date: '9 Sep' },
+        { name: 'Lachie Fogarty',   how: 'Delisted', date: '9 Sep' },
+        { name: 'Lewis Young',      how: 'Delisted', date: '9 Sep' },
+        { name: 'Elijah Hollands',  how: 'Delisted', date: '9 Sep', note: 'Stepping away from AFL in 2027' },
+        { name: 'Flynn Young',      how: 'Delisted', date: '9 Sep' },
+        { name: 'Harry Charleson',  how: 'Delisted', date: '9 Sep' },
+        { name: 'Matt Duffy',       how: 'Departed', date: 'Aug',    note: 'Returned home to Ireland' },
+        { name: 'Ben Camporeale',   how: 'Delisted', date: '10 Sep', note: 'May get a train-on after the draft' },
+        { name: 'Lucas Camporeale', how: 'Delisted', date: '10 Sep', note: 'May get a train-on after the draft' },
+        { name: 'Adam Saad',        how: 'Not offered a contract', date: '5 Oct' },
+        { name: "Hudson O'Keeffe",  how: 'Traded', date: 'Oct', note: 'To Western Bulldogs (five-team trade, future pick back)' },
+        { name: 'Flynn Riley',      how: 'Traded', date: 'Oct', note: 'Requested move; Carlton received a draft pick' },
+      ],
+      in: [
+        { id: 101, number: null, name: 'Joel Amartey', height: 195, dob: '1999-09-02', position: 'FWD', recruit: true, aflId: 'CD_I1008091',
+          how: 'Free agency', from: 'Sydney', note: 'Key forward; Sydney got compensation pick 36' },
+        { id: 102, number: null, name: 'Lachie Whitfield', height: 185, dob: '1994-07-18', position: 'DEF', recruit: true, aflId: 'CD_I294305',
+          how: 'Trade', from: 'GWS', note: 'Carlton gave picks 25, 26 + 2028 3rd round; got picks 31 and 50' },
+      ],
+      pending: [
+        { what: 'Wil Parker (Collingwood, delisted free agent)', note: 'Davies: "looks like it’ll get completed" in the delisted FA period' },
+        { what: 'Another ruck', note: 'Club wants one before 2027, via delisted FA or the draft' },
+        { what: 'National draft (Nov)', note: 'About five live picks, plus a likely father-son/academy bid to match' },
+      ],
+    };
+
+    const CARLTON_PLAYERS_2027 = CARLTON_PLAYERS
+      .filter(p => !LIST_CHANGES_2027.out.some(o => o.name === p.name))
+      .map(p => ({ ...p, recruit: false }))
+      .concat(LIST_CHANGES_2027.in.map(({ how, from, note, ...p }) => p));
+
+    // Fill in once the AFL releases the 2027 fixture.
+    const FIXTURE_2027 = [];
+    const RESULTS_2027 = {};
+    const MATCH_STATS_2027 = {};
+
+// ------------------- Season registry -------------------
+    const SEASONS = {
+      2026: { year: 2026, players: CARLTON_PLAYERS, fixture: FIXTURE_2026, results: RESULTS_2026,
+              stats: MATCH_STATS, seeds: buildSeedRatings, seedKey: 'carlton-seed-version', listChanges: null },
+      2027: { year: 2027, players: CARLTON_PLAYERS_2027, fixture: FIXTURE_2027, results: RESULTS_2027,
+              stats: MATCH_STATS_2027, seeds: () => ({}), seedKey: 'carlton-seed-version-2027', listChanges: LIST_CHANGES_2027 },
     };

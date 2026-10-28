@@ -1,0 +1,16 @@
+{
+  "name": "carlton-magnetboard",
+  "private": true,
+  "description": "Carlton FC season hub: magnet board, B&F votes, stats, fixture, list changes",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "node --check data.js && node --check app.js && node scripts/smoke.js"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.0",
+    "@babel/preset-react": "^7.23.0",
+    "jsdom": "^24.0.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  }
+}

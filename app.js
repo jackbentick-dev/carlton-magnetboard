@@ -1,17 +1,44 @@
-// ============================================================
-// carlton-magnetboard: APP (compiled from app.src.jsx — edit the
-// .jsx and recompile with Babel rather than editing this file)
-// ============================================================
+// carlton-magnetboard: APP (generated from app.src.jsx by `npm run build` — do not edit)
+// ---- Season context: one season renders at a time (App is re-keyed on switch) ----
+let S_YEAR = 2026,
+  S_PLAYERS,
+  S_FIXTURE,
+  S_RESULTS,
+  S_STATS,
+  S_SEEDS,
+  S_SEED_KEY,
+  S_LIST;
+const applySeason = y => {
+  const sz = SEASONS[y] || SEASONS[2026];
+  S_YEAR = sz.year;
+  S_PLAYERS = sz.players;
+  S_FIXTURE = sz.fixture;
+  S_RESULTS = sz.results;
+  S_STATS = sz.stats;
+  S_SEEDS = sz.seeds;
+  S_SEED_KEY = sz.seedKey;
+  S_LIST = sz.listChanges;
+};
+applySeason(2026);
+const numLabel = pl => pl.number === null || pl.number === undefined ? '–' : pl.number;
+// 'Lewis Young' -> 'L. Young' (the list has several shared surnames: Young, Camporeale, Hollands)
+const shortName = name => {
+  const pts = name.split(' ');
+  return pts.length > 1 ? `${pts[0][0]}. ${pts.slice(1).join(' ')}` : name;
+};
+const normName = s => s.toLowerCase().replace(/[^a-z]/g, '');
+const isTyping = el => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT');
 const {
   useState,
   useRef,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo
 } = React;
 const calculateAge = dob => {
   const birth = new Date(dob);
-  const today = new Date('2026-01-31');
+  const today = new Date(`${S_YEAR}-01-31`);
   let age = today.getFullYear() - birth.getFullYear();
   if (today.getMonth() < birth.getMonth() || today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate()) age--;
   return age;
@@ -127,7 +154,7 @@ const PlayerPhoto = ({
   size = 36
 }) => {
   const [srcIdx, setSrcIdx] = useState(0);
-  const sources = PHOTO_EXTS.map(ext => `players/${player.number}.${ext}`);
+  const sources = player.number == null ? [] : PHOTO_EXTS.map(ext => `players/${numLabel(player)}.${ext}`);
   if (PLAYER_PHOTOS[player.number]) sources.push(PLAYER_PHOTOS[player.number]);
   if (srcIdx >= sources.length) {
     return /*#__PURE__*/React.createElement("div", {
@@ -140,14 +167,14 @@ const PlayerPhoto = ({
         alignItems: 'center',
         justifyContent: 'center',
         color: '#fff',
-        fontSize: size * 0.44,
+        fontSize: size * (player.number == null ? 0.36 : 0.44),
         fontWeight: '600',
         fontFamily: "'Oswald', 'Inter', sans-serif",
         boxShadow: `0 2px 8px rgba(13,28,54,0.5), inset 0 1px 0 rgba(255,255,255,0.1)`,
         border: '2px solid rgba(255,255,255,0.2)',
         flexShrink: 0
       }
-    }, player.number);
+    }, player.number == null ? player.name.split(' ').map(w => w[0]).join('').slice(0, 2) : numLabel(player));
   }
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -194,7 +221,7 @@ const PlayerBadge = ({
       border: '2px solid rgba(255,255,255,0.15)',
       flexShrink: 0
     }
-  }, player.number);
+  }, numLabel(player));
 };
 
 // Glass Card Component
@@ -222,14 +249,15 @@ const FixturePanel = ({
 }) => {
   const res = results || {};
   const isPlayed = g => g.played || !!res[g.round];
-  const nextRound = (FIXTURE_2026.find(g => !isPlayed(g) && g.opponent !== 'BYE') || {}).round;
+  const nextRound = (S_FIXTURE.find(g => !isPlayed(g) && g.opponent !== 'BYE') || {}).round;
   const wins = Object.values(res).filter(r => r.result === 'W').length;
   const losses = Object.values(res).filter(r => r.result === 'L').length;
   const draws = Object.values(res).filter(r => r.result === 'D').length;
   return /*#__PURE__*/React.createElement(GlassCard, {
     style: {
       padding: '18px',
-      maxHeight: 'calc(100vh - 200px)',
+      flex: 1,
+      minHeight: 0,
       overflow: 'auto'
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -260,7 +288,7 @@ const FixturePanel = ({
       borderRadius: '2px',
       display: 'inline-block'
     }
-  }), "2026 FIXTURE", /*#__PURE__*/React.createElement("span", {
+  }), S_YEAR, " FIXTURE", /*#__PURE__*/React.createElement("span", {
     style: {
       color: 'rgba(255,255,255,0.45)',
       fontWeight: '700',
@@ -280,7 +308,7 @@ const FixturePanel = ({
       color: syncState === 'ok' ? '#22c55e' : syncState === 'fail' ? '#f87171' : 'rgba(255,255,255,0.55)',
       cursor: syncState === 'syncing' ? 'wait' : 'pointer'
     }
-  }, syncState === 'syncing' ? 'SYNCING…' : syncState === 'ok' ? '✓ UPDATED' : syncState === 'fail' ? '✗ OFFLINE' : '⟳ SYNC')), FIXTURE_2026.map((game, i) => {
+  }, syncState === 'syncing' ? 'SYNCING…' : syncState === 'ok' ? '✓ UPDATED' : syncState === 'fail' ? '✗ OFFLINE' : '⟳ SYNC')), S_FIXTURE.map((game, i) => {
     const isNext = game.round === nextRound;
     const played = isPlayed(game);
     const r = res[game.round];
@@ -292,7 +320,7 @@ const FixturePanel = ({
         borderRadius: isNext ? '12px' : 0,
         background: isNext ? 'linear-gradient(135deg, rgba(59,130,246,0.14) 0%, rgba(59,130,246,0.04) 100%)' : 'transparent',
         border: isNext ? '1px solid rgba(96,165,250,0.35)' : 'none',
-        borderBottom: isNext ? '1px solid rgba(96,165,250,0.35)' : i < FIXTURE_2026.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+        borderBottom: isNext ? '1px solid rgba(96,165,250,0.35)' : i < S_FIXTURE.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
         transition: 'background 0.15s ease',
         opacity: played && !isNext ? 0.55 : 1
       }
@@ -404,7 +432,7 @@ const RaceChart = ({
   playableRounds,
   playerTotals
 }) => {
-  const roundsWithVotes = playableRounds.map(g => g.round).filter(r => CARLTON_PLAYERS.some(pl => {
+  const roundsWithVotes = playableRounds.map(g => g.round).filter(r => S_PLAYERS.some(pl => {
     const v = votes[pl.id]?.[r];
     return v !== undefined && v !== null;
   }));
@@ -539,9 +567,9 @@ const BFPanel = ({
 }) => {
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState('');
-  const playableRounds = FIXTURE_2026.filter(g => g.opponent !== 'BYE');
+  const playableRounds = S_FIXTURE.filter(g => g.opponent !== 'BYE');
   const currentGame = playableRounds.find(g => g.round === selectedRound) || playableRounds[0];
-  const playerTotals = CARLTON_PLAYERS.map(player => {
+  const playerTotals = S_PLAYERS.map(player => {
     const roundVotes = votes[player.id] || {};
     // Only count rounds where score is explicitly set (not undefined) — blank = DNP
     const playedEntries = Object.entries(roundVotes).filter(([_, v]) => v !== undefined && v !== null);
@@ -597,8 +625,12 @@ const BFPanel = ({
         }
       }
       if (team === 'Carl' && playerName && !isNaN(rating)) {
-        const lastName = playerName.split(' ').pop().toLowerCase();
-        const player = CARLTON_PLAYERS.find(p => p.name.toLowerCase().includes(lastName) || p.name.split(' ').pop().toLowerCase() === lastName);
+        // Exact name first; a surname only counts if it's unique (or unique with the first initial)
+        const surname = normName(playerName.split(' ').pop());
+        const initial = normName(playerName)[0];
+        const sameSurname = S_PLAYERS.filter(p => normName(p.name.split(' ').pop()) === surname);
+        const sameInitial = sameSurname.filter(p => normName(p.name)[0] === initial);
+        const player = S_PLAYERS.find(p => normName(p.name) === normName(playerName)) || (sameSurname.length === 1 ? sameSurname[0] : sameInitial.length === 1 ? sameInitial[0] : null);
         if (player) {
           newRatings[player.id] = {
             rating,
@@ -618,7 +650,7 @@ const BFPanel = ({
   };
   const getPlayerStats = playerId => ratings[selectedRound]?.[playerId];
   const hasRatings = ratings[selectedRound] && Object.keys(ratings[selectedRound]).length > 0;
-  const voteList = [...CARLTON_PLAYERS].sort((a, b) => {
+  const voteList = [...S_PLAYERS].sort((a, b) => {
     const statsA = getPlayerStats(a.id);
     const statsB = getPlayerStats(b.id);
     if (statsA?.rating !== undefined && statsB?.rating !== undefined) return statsB.rating - statsA.rating;
@@ -627,7 +659,7 @@ const BFPanel = ({
     return a.number - b.number;
   });
   const voteRowRefs = useRef({});
-  const scoredCount = CARLTON_PLAYERS.filter(p2 => {
+  const scoredCount = S_PLAYERS.filter(p2 => {
     const v = votes[p2.id]?.[selectedRound];
     return v !== undefined && v !== null;
   }).length;
@@ -635,7 +667,8 @@ const BFPanel = ({
   return /*#__PURE__*/React.createElement(GlassCard, {
     style: {
       padding: '16px',
-      maxHeight: 'calc(100vh - 200px)',
+      flex: 1,
+      minHeight: 0,
       overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column'
@@ -947,7 +980,8 @@ const BFPanel = ({
         return acc;
       }, []);
       const avgRating = ratingEntries.length > 0 ? ratingEntries.reduce((s, d) => s + d.rating, 0) / ratingEntries.length : null;
-      const avgTog = ratingEntries.length > 0 ? ratingEntries.reduce((s, d) => s + d.tog, 0) / ratingEntries.length : null;
+      const togEntries = ratingEntries.filter(d => d.tog !== null && d.tog !== undefined);
+      const avgTog = togEntries.length > 0 ? togEntries.reduce((s, d) => s + d.tog, 0) / togEntries.length : null;
       return /*#__PURE__*/React.createElement("div", {
         key: player.id,
         style: {
@@ -1121,7 +1155,7 @@ const StatsPanel = () => {
   const [selRound, setSelRound] = useState('ALL');
   const [selCat, setSelCat] = useState('Rating');
   const [selStat, setSelStat] = useState('rating');
-  const rounds = ['ALL', ...Object.keys(MATCH_STATS)];
+  const rounds = ['ALL', ...Object.keys(S_STATS)];
   const statDef = Object.values(STAT_CATEGORIES).flat().find(s => s.key === selStat) || {
     label: selStat,
     color: '#3b82f6'
@@ -1130,9 +1164,9 @@ const StatsPanel = () => {
   // Aggregate player data
   const playerData = (() => {
     const map = {};
-    const activeRounds = selRound === 'ALL' ? Object.keys(MATCH_STATS) : [selRound];
+    const activeRounds = selRound === 'ALL' ? Object.keys(S_STATS) : [selRound];
     activeRounds.forEach(r => {
-      const rd = MATCH_STATS[r];
+      const rd = S_STATS[r];
       if (!rd) return;
       rd.players.forEach(p => {
         if (!map[p.name]) map[p.name] = {
@@ -1152,6 +1186,26 @@ const StatsPanel = () => {
   })();
   const maxVal = Math.max(...playerData.map(p => Math.abs(p.value)), 1);
   const hasNegative = playerData.some(p => p.value < 0);
+  const roundIdx = rounds.indexOf(selRound);
+  const stepRound = d => setSelRound(rounds[Math.max(0, Math.min(rounds.length - 1, roundIdx + d))]);
+  const roundLabel = r => {
+    if (r === 'ALL') return `Season average (${rounds.length - 1} games)`;
+    const g = S_FIXTURE.find(f => f.round === r);
+    const res = S_RESULTS[r];
+    return `${r}  ${g ? g.home ? 'vs' : '@' : 'v'} ${S_STATS[r].opponent}${res ? `  (${res.result} ${res.for}–${res.against})` : ''}`;
+  };
+  const arrowStyle = off => ({
+    width: '34px',
+    flexShrink: 0,
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '8px',
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: '15px',
+    fontWeight: '700',
+    cursor: off ? 'default' : 'pointer',
+    opacity: off ? 0.3 : 1
+  });
   return /*#__PURE__*/React.createElement(GlassCard, {
     style: {
       flex: 1,
@@ -1167,24 +1221,39 @@ const StatsPanel = () => {
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
-      gap: '3px',
+      gap: '6px',
       marginBottom: '8px'
     }
-  }, rounds.map(r => /*#__PURE__*/React.createElement("button", {
-    key: r,
-    onClick: () => setSelRound(r),
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => stepRound(-1),
+    disabled: roundIdx <= 0,
+    title: "Previous",
+    style: arrowStyle(roundIdx <= 0)
+  }, "‹"), /*#__PURE__*/React.createElement("select", {
+    value: selRound,
+    onChange: e => setSelRound(e.target.value),
     style: {
       flex: 1,
-      padding: '5px 0',
-      background: selRound === r ? 'linear-gradient(135deg, #ffffff 0%, #dce5f2 100%)' : 'rgba(255,255,255,0.05)',
-      color: selRound === r ? CARLTON_NAVY : 'rgba(255,255,255,0.4)',
-      border: selRound === r ? 'none' : '1px solid rgba(255,255,255,0.08)',
-      borderRadius: '6px',
-      fontSize: '10px',
-      fontWeight: '700',
-      cursor: 'pointer'
+      minWidth: 0,
+      padding: '8px 10px',
+      background: CARLTON_NAVY,
+      color: '#fff',
+      border: '1px solid rgba(255,255,255,0.15)',
+      borderRadius: '8px',
+      fontSize: '12px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      fontFamily: 'Inter, sans-serif'
     }
-  }, r === 'ALL' ? 'AVG' : r))), /*#__PURE__*/React.createElement("div", {
+  }, rounds.map(r => /*#__PURE__*/React.createElement("option", {
+    key: r,
+    value: r
+  }, roundLabel(r)))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => stepRound(1),
+    disabled: roundIdx >= rounds.length - 1,
+    title: "Next",
+    style: arrowStyle(roundIdx >= rounds.length - 1)
+  }, "›")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '3px',
@@ -1235,7 +1304,7 @@ const StatsPanel = () => {
       textTransform: 'uppercase',
       letterSpacing: '0.5px'
     }
-  }, statDef.label, " ", selRound === 'ALL' ? '(season avg)' : `— ${MATCH_STATS[selRound]?.opponent || ''}`), /*#__PURE__*/React.createElement("div", {
+  }, statDef.label, " ", selRound === 'ALL' ? '(season avg)' : `— ${S_STATS[selRound]?.opponent || ''}`), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       overflow: 'auto',
@@ -1250,6 +1319,7 @@ const StatsPanel = () => {
       padding: '4px 0'
     }
   }, /*#__PURE__*/React.createElement("div", {
+    title: p.name,
     style: {
       width: '100px',
       color: i < 3 ? '#fff' : 'rgba(255,255,255,0.5)',
@@ -1259,7 +1329,7 @@ const StatsPanel = () => {
       overflow: 'hidden',
       textOverflow: 'ellipsis'
     }
-  }, p.name.split(' ').pop()), /*#__PURE__*/React.createElement("div", {
+  }, shortName(p.name)), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       height: '14px',
@@ -1309,7 +1379,16 @@ const StatsPanel = () => {
       fontSize: '10px',
       fontWeight: '700'
     }
-  }, p.value)))));
+  }, p.value), selRound === 'ALL' && /*#__PURE__*/React.createElement("div", {
+    title: `${p.rounds} games`,
+    style: {
+      width: '22px',
+      textAlign: 'right',
+      color: 'rgba(255,255,255,0.28)',
+      fontSize: '9px',
+      fontWeight: '600'
+    }
+  }, p.rounds, "g")))));
 };
 
 // Head-to-head player comparison
@@ -1319,10 +1398,10 @@ const ComparePanel = ({
 }) => {
   const [aId, setAId] = useState(1);
   const [bId, setBId] = useState(2);
-  const A = CARLTON_PLAYERS.find(pl => pl.id === aId);
-  const B = CARLTON_PLAYERS.find(pl => pl.id === bId);
-  const roster = [...CARLTON_PLAYERS].sort((x, y) => x.number - y.number);
-  const playable = FIXTURE_2026.filter(g => g.opponent !== 'BYE').map(g => g.round);
+  const A = S_PLAYERS.find(pl => pl.id === aId);
+  const B = S_PLAYERS.find(pl => pl.id === bId);
+  const roster = [...S_PLAYERS].sort((x, y) => x.number - y.number);
+  const playable = S_FIXTURE.filter(g => g.opponent !== 'BYE').map(g => g.round);
   const seriesFor = id => playable.map(r => {
     const e = ratings[r]?.[id];
     return e && e.rating !== null && e.rating !== undefined ? e.rating : null;
@@ -1330,8 +1409,9 @@ const ComparePanel = ({
   const avgFor = pl => {
     const acc = {};
     let games = 0;
-    Object.values(MATCH_STATS).forEach(rd => {
-      const rec = rd.players.find(x => x.name === pl.name) || rd.players.find(x => x.name.split(' ').pop() === pl.name.split(' ').pop());
+    Object.values(S_STATS).forEach(rd => {
+      // Exact name only: a surname fallback credited e.g. Flynn Young with Lewis Young's games
+      const rec = rd.players.find(x => x.name === pl.name);
       if (!rec) return;
       games++;
       H2H_STATS.forEach(([k]) => {
@@ -1404,7 +1484,7 @@ const ComparePanel = ({
       overflow: 'hidden',
       textOverflow: 'ellipsis'
     }
-  }, "#", pl.number, " ", pl.name.split(' ').pop()), /*#__PURE__*/React.createElement("div", {
+  }, "#", numLabel(pl), " ", pl.name), /*#__PURE__*/React.createElement("div", {
     style: {
       color: 'rgba(255,255,255,0.4)',
       fontSize: '10px'
@@ -1435,7 +1515,7 @@ const ComparePanel = ({
   }, roster.map(pl => /*#__PURE__*/React.createElement("option", {
     key: pl.id,
     value: pl.id
-  }, "#", pl.number, " ", pl.name))), /*#__PURE__*/React.createElement("span", {
+  }, "#", numLabel(pl), " ", pl.name))), /*#__PURE__*/React.createElement("span", {
     style: {
       color: 'rgba(255,255,255,0.35)',
       fontSize: '11px',
@@ -1449,7 +1529,7 @@ const ComparePanel = ({
   }, roster.map(pl => /*#__PURE__*/React.createElement("option", {
     key: pl.id,
     value: pl.id
-  }, "#", pl.number, " ", pl.name)))), /*#__PURE__*/React.createElement("div", {
+  }, "#", numLabel(pl), " ", pl.name)))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '10px'
@@ -1591,6 +1671,184 @@ const ComparePanel = ({
   })));
 };
 
+// 2027 list changes: who's gone, who's in, what's still to come
+const ListPanel = () => {
+  const L = S_LIST;
+  const prev = SEASONS[2026].players;
+  const outs = L.out.map(o => ({
+    ...o,
+    player: prev.find(pl => pl.name === o.name)
+  }));
+  const groups = [['Delisted / not offered', outs.filter(o => o.how !== 'Traded' && o.how !== 'Departed')], ['Traded / departed', outs.filter(o => o.how === 'Traded' || o.how === 'Departed')]];
+  const sectionHead = (label, color, count) => /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      margin: '14px 0 6px'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: '3px',
+      height: '13px',
+      background: color,
+      borderRadius: '2px',
+      display: 'inline-block'
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#fff',
+      fontSize: '11px',
+      fontWeight: '800',
+      letterSpacing: '1.5px'
+    }
+  }, label), count !== undefined && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color,
+      fontSize: '11px',
+      fontWeight: '800'
+    }
+  }, count));
+  const row = (key, pl, title, sub, accent, tag) => /*#__PURE__*/React.createElement("div", {
+    key: key,
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      padding: '8px 0',
+      borderBottom: '1px solid rgba(255,255,255,0.04)'
+    }
+  }, pl ? /*#__PURE__*/React.createElement(PlayerPhoto, {
+    player: pl,
+    size: 34
+  }) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 34
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: '#fff',
+      fontSize: '13px',
+      fontWeight: '700'
+    }
+  }, title), sub && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.45)',
+      fontSize: '10.5px',
+      marginTop: '2px'
+    }
+  }, sub)), tag && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: accent,
+      fontSize: '10px',
+      fontWeight: '700',
+      whiteSpace: 'nowrap'
+    }
+  }, tag));
+  return /*#__PURE__*/React.createElement(GlassCard, {
+    style: {
+      flex: 1,
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '14px 16px 10px',
+      borderBottom: '1px solid rgba(255,255,255,0.06)',
+      display: 'flex',
+      alignItems: 'baseline',
+      justifyContent: 'space-between'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#fff',
+      fontSize: '13px',
+      fontWeight: '800',
+      letterSpacing: '2px'
+    }
+  }, "2027 LIST CHANGES"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'rgba(255,255,255,0.45)',
+      fontSize: '10px',
+      fontWeight: '600'
+    }
+  }, "as at ", L.asAt)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '8px',
+      padding: '12px 16px 0'
+    }
+  }, [['ON LIST', S_PLAYERS.length, '#fff'], ['IN', L.in.length, '#4ade80'], ['OUT', L.out.length, '#f87171']].map(([lab, v, c]) => /*#__PURE__*/React.createElement("div", {
+    key: lab,
+    style: {
+      flex: 1,
+      textAlign: 'center',
+      background: 'rgba(255,255,255,0.04)',
+      borderRadius: '10px',
+      padding: '8px 0'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: c,
+      fontSize: '22px',
+      fontWeight: '600',
+      fontFamily: "'Oswald', 'Inter', sans-serif"
+    }
+  }, v), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: '9px',
+      fontWeight: '700',
+      letterSpacing: '1px'
+    }
+  }, lab)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      overflow: 'auto',
+      padding: '0 16px 12px'
+    }
+  }, sectionHead('ARRIVALS', '#4ade80', L.in.length), L.in.map(r => row('in' + r.id, r, r.name, `${r.how} from ${r.from}${r.note ? ' • ' + r.note : ''}`, '#4ade80', 'NEW')), groups.map(([label, items]) => /*#__PURE__*/React.createElement(React.Fragment, {
+    key: label
+  }, sectionHead(label.toUpperCase(), '#f87171', items.length), items.map(o => row('out' + o.name, o.player, o.name, `${o.how}${o.note ? ' • ' + o.note : ''}`, 'rgba(255,255,255,0.4)', o.date)))), L.pending && L.pending.length > 0 && sectionHead('STILL TO COME', '#fbbf24'), (L.pending || []).map((pd, i) => row('pd' + i, null, pd.what, pd.note, '#fbbf24', 'PENDING'))));
+};
+
+// Shown for match-based tabs before a season has a fixture
+const EmptySeasonCard = ({
+  what
+}) => /*#__PURE__*/React.createElement(GlassCard, {
+  style: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '30px'
+  }
+}, /*#__PURE__*/React.createElement("div", {
+  style: {
+    textAlign: 'center'
+  }
+}, /*#__PURE__*/React.createElement("div", {
+  style: {
+    color: '#fff',
+    fontSize: '15px',
+    fontWeight: '800',
+    letterSpacing: '1px',
+    marginBottom: '8px'
+  }
+}, S_YEAR, " ", what), /*#__PURE__*/React.createElement("div", {
+  style: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: '12px',
+    lineHeight: 1.5
+  }
+}, "The ", S_YEAR, " fixture hasn't been released yet. This fills in once the fixture is added to data.js.")));
+
 // Left Panel
 const LeftPanel = ({
   votes,
@@ -1605,14 +1863,13 @@ const LeftPanel = ({
   onSyncResults,
   syncState
 }) => {
-  const [activeTab, setActiveTab] = useState('bf');
+  const [activeTab, setActiveTab] = useState(S_LIST ? 'list' : 'bf');
+  const noFixture = S_FIXTURE.length === 0;
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      position: 'absolute',
-      left: '16px',
-      top: '60px',
-      bottom: '16px',
       width: '420px',
+      flexShrink: 0,
+      minHeight: 0,
       display: 'flex',
       flexDirection: 'column',
       gap: '10px',
@@ -1623,7 +1880,10 @@ const LeftPanel = ({
       display: 'flex',
       gap: '6px'
     }
-  }, [{
+  }, [...(S_LIST ? [{
+    key: 'list',
+    label: 'List'
+  }] : []), {
     key: 'bf',
     label: 'B&F'
   }, {
@@ -1658,7 +1918,13 @@ const LeftPanel = ({
       justifyContent: 'center',
       gap: '4px'
     }
-  }, tab.label))), activeTab === 'bf' ? /*#__PURE__*/React.createElement(BFPanel, {
+  }, tab.label))), activeTab === 'list' && S_LIST ? /*#__PURE__*/React.createElement(ListPanel, null) : noFixture && activeTab === 'bf' ? /*#__PURE__*/React.createElement(EmptySeasonCard, {
+    what: "BEST & FAIREST"
+  }) : noFixture && activeTab === 'stats' ? /*#__PURE__*/React.createElement(EmptySeasonCard, {
+    what: "MATCH STATS"
+  }) : noFixture && activeTab === 'fixture' ? /*#__PURE__*/React.createElement(EmptySeasonCard, {
+    what: "FIXTURE"
+  }) : activeTab === 'bf' ? /*#__PURE__*/React.createElement(BFPanel, {
     votes: votes,
     setVotes: setVotes,
     selectedRound: selectedRound,
@@ -1681,6 +1947,7 @@ const Magnet = ({
   player,
   style,
   onMouseDown,
+  onClick,
   onDoubleClick,
   onDragStart,
   onPointerDown,
@@ -1692,6 +1959,7 @@ const Magnet = ({
     onDragStart: onDragStart,
     onMouseDown: onMouseDown,
     onPointerDown: onPointerDown,
+    onClick: onClick,
     onDoubleClick: onDoubleClick,
     style: {
       position: 'absolute',
@@ -1777,7 +2045,7 @@ const Magnet = ({
       textAlign: 'center',
       flexShrink: 0
     }
-  }, player.number), /*#__PURE__*/React.createElement("div", {
+  }, numLabel(player)), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }
@@ -2108,16 +2376,37 @@ const PositionLabels = () => /*#__PURE__*/React.createElement("div", {
 // Premium Sidebar
 const Sidebar = ({
   players,
+  selected,
   onDragStart,
   onRemovePlayer,
   onPointerStart,
+  onOpenCard,
   filter,
   setFilter,
+  query,
+  setQuery,
   fieldCount,
   interchangeCount
 }) => {
   const totalSelected = fieldCount + interchangeCount;
   const isComplete = fieldCount === 18 && interchangeCount === 5;
+  const searchRef = useRef(null);
+
+  // '/' jumps to the search box, like most sites
+  useEffect(() => {
+    const key = e => {
+      if (e.key === '/' && !isTyping(e.target) && searchRef.current) {
+        e.preventDefault();
+        searchRef.current.focus();
+      }
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, []);
+  const {
+    comp,
+    warnings
+  } = teamBalance(selected, fieldCount);
   const handleDrop = e => {
     e.preventDefault();
     const data = e.dataTransfer.getData('player');
@@ -2176,7 +2465,7 @@ const Sidebar = ({
       fontWeight: '500',
       letterSpacing: '1px'
     }
-  }, "2026 TEAM SELECTION"))), /*#__PURE__*/React.createElement(GlassCard, {
+  }, S_YEAR, " TEAM SELECTION"))), /*#__PURE__*/React.createElement(GlassCard, {
     style: {
       padding: '16px',
       marginBottom: '14px'
@@ -2238,7 +2527,59 @@ const Sidebar = ({
       fontWeight: '700',
       border: '1px solid rgba(34,197,94,0.3)'
     }
-  }, "✓ TEAM COMPLETE (18 + 5)")), /*#__PURE__*/React.createElement("div", {
+  }, "✓ TEAM COMPLETE (18 + 5)"), comp && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      marginTop: isComplete ? '10px' : 0,
+      paddingTop: '10px',
+      borderTop: '1px solid rgba(255,255,255,0.06)'
+    }
+  }, [['AVG AGE', comp.age.toFixed(1), 'Average age of the selected players'], ['AVG HT', `${Math.round(comp.height)}`, 'Average height (cm)'], ['TALLS', comp.talls, 'Non-midfielders 193cm or taller, rucks included'], ['RUCKS', comp.rucks, 'Players listed as rucks']].map(([label, v, tip]) => /*#__PURE__*/React.createElement("div", {
+    key: label,
+    title: tip,
+    style: {
+      textAlign: 'center',
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.85)',
+      fontSize: '13px',
+      fontWeight: '700'
+    }
+  }, v), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.35)',
+      fontSize: '8px',
+      fontWeight: '700',
+      letterSpacing: '0.8px',
+      marginTop: '1px'
+    }
+  }, label)))), warnings.map(w => /*#__PURE__*/React.createElement("div", {
+    key: w,
+    style: {
+      marginTop: '8px',
+      padding: '6px 9px',
+      background: 'rgba(251,191,36,0.1)',
+      border: '1px solid rgba(251,191,36,0.25)',
+      borderRadius: '7px',
+      color: '#fbbf24',
+      fontSize: '10.5px',
+      fontWeight: '700',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '7px'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: '6px',
+      height: '6px',
+      borderRadius: '50%',
+      background: '#fbbf24',
+      flexShrink: 0
+    }
+  }), w))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '5px'
@@ -2262,7 +2603,75 @@ const Sidebar = ({
         boxShadow: filter === key ? '0 2px 8px rgba(0,0,0,0.2)' : 'none'
       }
     }, pos);
-  }))), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'relative',
+      marginTop: '10px'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    ref: searchRef,
+    value: query,
+    onChange: e => setQuery(e.target.value),
+    onKeyDown: e => {
+      if (e.key === 'Escape') {
+        setQuery('');
+        e.currentTarget.blur();
+      }
+    },
+    onFocus: e => {
+      e.currentTarget.style.borderColor = 'rgba(96,165,250,0.6)';
+    },
+    onBlur: e => {
+      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+    },
+    placeholder: "Find a player or number",
+    spellCheck: false,
+    style: {
+      width: '100%',
+      padding: '9px 34px 9px 12px',
+      background: 'rgba(255,255,255,0.05)',
+      border: '1px solid rgba(255,255,255,0.1)',
+      borderRadius: '8px',
+      color: '#fff',
+      fontSize: '12px',
+      fontWeight: '500',
+      fontFamily: 'Inter, sans-serif',
+      outline: 'none',
+      transition: 'border-color 0.15s ease'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute',
+      right: '6px',
+      top: 0,
+      bottom: 0,
+      display: 'flex',
+      alignItems: 'center'
+    }
+  }, query ? /*#__PURE__*/React.createElement("button", {
+    onClick: () => setQuery(''),
+    title: "Clear search (Esc)",
+    style: {
+      width: '22px',
+      height: '22px',
+      borderRadius: '6px',
+      border: 'none',
+      background: 'rgba(255,255,255,0.08)',
+      color: 'rgba(255,255,255,0.6)',
+      fontSize: '11px',
+      cursor: 'pointer'
+    }
+  }, "✕") : /*#__PURE__*/React.createElement("span", {
+    title: "Press / to search",
+    style: {
+      padding: '1px 7px',
+      borderRadius: '5px',
+      border: '1px solid rgba(255,255,255,0.12)',
+      color: 'rgba(255,255,255,0.3)',
+      fontSize: '10px',
+      fontWeight: '700'
+    }
+  }, "/")))), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       overflow: 'auto',
@@ -2275,12 +2684,13 @@ const Sidebar = ({
       textAlign: 'center',
       padding: '40px 20px'
     }
-  }, filter === 'ALL' ? 'All players on field!' : `No ${filter} available`) : players.map(player => {
+  }, query.trim() ? `No available player matches “${query.trim()}”` : filter === 'ALL' ? 'All players on field!' : `No ${filter} available`) : players.map(player => {
     return /*#__PURE__*/React.createElement("div", {
       key: player.id,
       draggable: true,
       onDragStart: e => onDragStart(e, player),
       onPointerDown: e => onPointerStart && onPointerStart(e, player, 'sidebar'),
+      onClick: e => onOpenCard && onOpenCard(e, player),
       style: {
         background: 'rgba(255,255,255,0.04)',
         borderRadius: '12px',
@@ -2320,7 +2730,7 @@ const Sidebar = ({
         textAlign: 'center',
         flexShrink: 0
       }
-    }, player.number), /*#__PURE__*/React.createElement("div", {
+    }, numLabel(player)), /*#__PURE__*/React.createElement("div", {
       style: {
         flex: 1,
         minWidth: 0
@@ -2363,82 +2773,1565 @@ const Sidebar = ({
     }, player.height, "cm • ", calculateAge(player.dob), "yo")));
   })));
 };
-function App() {
-  const [fieldPlayers, setFieldPlayers] = useState(() => {
+const POS_NAMES = {
+  DEF: 'Defender',
+  MID: 'Midfielder',
+  RUCK: 'Ruck',
+  FWD: 'Forward'
+};
+
+// This season's numbers for the player card, or last season's before the first bounce
+const seasonSummary = (player, votes) => {
+  let year = S_YEAR,
+    stats = S_STATS;
+  if (!Object.keys(stats).length && SEASONS[S_YEAR - 1]) {
+    year = S_YEAR - 1;
+    stats = SEASONS[year].stats;
+  }
+  const games = Object.entries(stats).map(([r, rd]) => ({
+    r,
+    opp: rd.opponent,
+    rec: rd.players.find(x => x.name === player.name)
+  })).filter(g => g.rec);
+  let bf = votes;
+  if (year !== S_YEAR) {
     try {
-      const saved = localStorage.getItem('carlton-board-2026');
-      return saved ? JSON.parse(saved) : {};
+      bf = JSON.parse(localStorage.getItem(`carlton-bf-${year}`)) || {};
+    } catch {
+      bf = {};
+    }
+  }
+  const pv = Object.values(bf[player.id] || {}).filter(v => v !== undefined && v !== null);
+  const avgOf = k => games.reduce((s, g) => s + (g.rec[k] || 0), 0) / games.length;
+  return {
+    year,
+    games,
+    rating: games.length ? avgOf('rating') : null,
+    disp: games.length ? avgOf('d') : null,
+    goals: games.reduce((s, g) => s + (g.rec.g || 0), 0),
+    votes: pv.length ? pv.reduce((s, v) => s + v, 0) : null
+  };
+};
+
+// Who they are and how their season's going: shared by the desktop card and the mobile sheet
+const PlayerSummary = ({
+  player,
+  votes
+}) => {
+  const s = seasonSummary(player, votes);
+  const vals = s.games.map(g => g.rec.rating);
+  const SW = 276,
+    SH = 46;
+  const hi = Math.max(1, ...vals),
+    lo = Math.min(0, ...vals);
+  const sx = i => vals.length === 1 ? SW / 2 : 4 + i * (SW - 8) / (vals.length - 1);
+  const sy = v => 5 + (1 - (v - lo) / (hi - lo)) * (SH - 10);
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      paddingRight: '24px'
+    }
+  }, /*#__PURE__*/React.createElement(PlayerPhoto, {
+    player: player,
+    size: 52
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#fff',
+      fontWeight: '600',
+      fontSize: '32px',
+      fontFamily: "'Oswald', 'Inter', sans-serif",
+      lineHeight: 1,
+      textShadow: '0 2px 5px rgba(0,0,0,0.55)',
+      minWidth: '30px',
+      textAlign: 'center'
+    }
+  }, numLabel(player)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: '#fff',
+      fontSize: '15px',
+      fontWeight: '800',
+      lineHeight: 1.2,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      flexWrap: 'wrap'
+    }
+  }, player.name, player.captain && /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+      color: '#000',
+      fontSize: '9px',
+      fontWeight: '900',
+      padding: '2px 6px',
+      borderRadius: '5px'
+    }
+  }, "CAPTAIN"), player.recruit && /*#__PURE__*/React.createElement("span", {
+    style: {
+      background: 'rgba(34,197,94,0.2)',
+      color: '#22c55e',
+      fontSize: '9px',
+      fontWeight: '700',
+      padding: '2px 6px',
+      borderRadius: '5px'
+    }
+  }, "NEW")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.5)',
+      fontSize: '11px',
+      marginTop: '3px'
+    }
+  }, POS_NAMES[player.position] || player.position, " • ", player.height, "cm • ", calculateAge(player.dob), "y"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      margin: '14px 0 8px',
+      display: 'flex',
+      alignItems: 'baseline',
+      justifyContent: 'space-between'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'rgba(255,255,255,0.45)',
+      fontSize: '9px',
+      fontWeight: '800',
+      letterSpacing: '1.5px'
+    }
+  }, s.year, " SEASON"), s.year !== S_YEAR && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'rgba(255,255,255,0.3)',
+      fontSize: '9.5px'
+    }
+  }, "no ", S_YEAR, " games yet")), s.games.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: '11.5px',
+      padding: '6px 0 4px'
+    }
+  }, player.recruit ? `No Carlton games yet: recruited ${S_YEAR > s.year ? 'for ' + S_YEAR : 'this season'}.` : `No senior games in ${s.year}.`) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '6px'
+    }
+  }, [['GAMES', s.games.length], ['RATING', s.rating.toFixed(1)], ['DISP', s.disp.toFixed(1)], ['GOALS', s.goals]].map(([l, v]) => /*#__PURE__*/React.createElement("div", {
+    key: l,
+    style: {
+      flex: 1,
+      textAlign: 'center',
+      background: 'rgba(255,255,255,0.05)',
+      borderRadius: '8px',
+      padding: '7px 0'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: '#fff',
+      fontSize: '17px',
+      fontWeight: '600',
+      fontFamily: "'Oswald', 'Inter', sans-serif"
+    }
+  }, v), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.38)',
+      fontSize: '8px',
+      fontWeight: '700',
+      letterSpacing: '0.8px'
+    }
+  }, l)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.3)',
+      fontSize: '9px',
+      fontWeight: '600',
+      margin: '10px 0 2px'
+    }
+  }, "Wheelo rating by game"), /*#__PURE__*/React.createElement("svg", {
+    viewBox: `0 0 ${SW} ${SH}`,
+    style: {
+      width: '100%',
+      display: 'block'
+    }
+  }, lo < 0 && /*#__PURE__*/React.createElement("line", {
+    x1: "0",
+    x2: SW,
+    y1: sy(0),
+    y2: sy(0),
+    stroke: "rgba(255,255,255,0.12)",
+    strokeWidth: "1"
+  }), vals.length > 1 && /*#__PURE__*/React.createElement("polyline", {
+    points: vals.map((v, i) => `${sx(i)},${sy(v)}`).join(' '),
+    fill: "none",
+    stroke: "#60a5fa",
+    strokeWidth: "1.8",
+    strokeLinejoin: "round",
+    strokeLinecap: "round"
+  }), s.games.map((g, i) => /*#__PURE__*/React.createElement("circle", {
+    key: g.r,
+    cx: sx(i),
+    cy: sy(g.rec.rating),
+    r: "2.4",
+    fill: "#60a5fa"
+  }, /*#__PURE__*/React.createElement("title", null, `${g.r} v ${g.opp}: ${g.rec.rating.toFixed(1)}`)))), s.votes !== null && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: '8px',
+      color: 'rgba(255,255,255,0.55)',
+      fontSize: '11px'
+    }
+  }, "Your B&F votes: ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#fbbf24',
+      fontWeight: '800'
+    }
+  }, s.votes))));
+};
+
+// Click a magnet, bench card or list row: the summary plus quick moves
+const PlayerCard = ({
+  player,
+  rect,
+  votes,
+  status,
+  benchFull,
+  onClose,
+  onBench,
+  onRemove
+}) => {
+  const ref = useRef(null);
+  const [pos, setPos] = useState({
+    left: -9999,
+    top: 0
+  });
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const w = el.offsetWidth,
+      h = el.offsetHeight,
+      gap = 12,
+      pad = 8;
+    let left = rect.right + gap;
+    if (left + w > window.innerWidth - pad) left = rect.left - w - gap;
+    left = Math.max(pad, Math.min(window.innerWidth - w - pad, left));
+    const top = Math.max(pad, Math.min(window.innerHeight - h - pad, rect.top));
+    setPos({
+      left,
+      top
+    });
+  }, [rect, player.id]);
+  useEffect(() => {
+    const down = e => {
+      if (ref.current && !ref.current.contains(e.target)) onClose();
+    };
+    const key = e => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('mousedown', down, true);
+    document.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('mousedown', down, true);
+      document.removeEventListener('keydown', key);
+    };
+  }, [onClose]);
+  const actionBtn = (label, onClick, tone, disabled) => /*#__PURE__*/React.createElement("button", {
+    key: label,
+    onClick: onClick,
+    disabled: disabled,
+    style: {
+      flex: 1,
+      padding: '8px 6px',
+      borderRadius: '8px',
+      background: tone === 'red' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.07)',
+      border: `1px solid ${tone === 'red' ? 'rgba(239,68,68,0.28)' : 'rgba(255,255,255,0.12)'}`,
+      color: tone === 'red' ? '#f87171' : '#fff',
+      fontSize: '11px',
+      fontWeight: '700',
+      cursor: disabled ? 'default' : 'pointer',
+      opacity: disabled ? 0.35 : 1
+    }
+  }, label);
+  return /*#__PURE__*/React.createElement("div", {
+    ref: ref,
+    style: {
+      position: 'fixed',
+      left: pos.left,
+      top: pos.top,
+      width: '304px',
+      zIndex: 3000,
+      background: `linear-gradient(160deg, ${CARLTON_NAVY_LIGHT} 0%, ${CARLTON_NAVY} 55%, ${CARLTON_NAVY_DARK} 100%)`,
+      border: '1px solid rgba(255,255,255,0.14)',
+      borderRadius: '16px',
+      boxShadow: '0 24px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08)',
+      padding: '14px',
+      animation: 'float-in 0.16s ease'
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    title: "Close (Esc)",
+    style: {
+      position: 'absolute',
+      top: '10px',
+      right: '10px',
+      width: '24px',
+      height: '24px',
+      borderRadius: '7px',
+      border: 'none',
+      background: 'rgba(255,255,255,0.06)',
+      color: 'rgba(255,255,255,0.5)',
+      fontSize: '11px',
+      cursor: 'pointer'
+    }
+  }, "✕"), /*#__PURE__*/React.createElement(PlayerSummary, {
+    player: player,
+    votes: votes
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '6px',
+      marginTop: '14px'
+    }
+  }, status === 'field' && actionBtn('Move to bench', onBench, null, benchFull), status === 'none' && actionBtn(benchFull ? 'Bench is full' : 'Add to bench', onBench, null, benchFull), status !== 'none' && actionBtn('Remove from board', onRemove, 'red')));
+};
+
+// ---- Shared by the desktop board and the mobile app ----
+
+const SEED_VERSION = '2';
+const loadJSON = key => {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+};
+// Wheelo ratings: bundled seed rounds are written once per SEED_VERSION;
+// after that, user-imported data is never clobbered on load.
+const loadRatings = () => {
+  try {
+    const saved = localStorage.getItem(`carlton-wheelo-${S_YEAR}`);
+    if (!saved) return S_SEEDS();
+    const parsed = JSON.parse(saved);
+    const seeds = S_SEEDS();
+    let storedVer = null;
+    try {
+      storedVer = localStorage.getItem(S_SEED_KEY);
+    } catch {}
+    if (storedVer !== SEED_VERSION) {
+      Object.keys(seeds).forEach(r => {
+        parsed[r] = seeds[r];
+      });
+      try {
+        localStorage.setItem(S_SEED_KEY, SEED_VERSION);
+      } catch {}
+    } else {
+      Object.keys(seeds).forEach(r => {
+        if (!parsed[r]) parsed[r] = seeds[r];
+      });
+    }
+    return parsed;
+  } catch {
+    return S_SEEDS();
+  }
+};
+
+// Undo toast (clear, remove). ⌘Z/Ctrl+Z undoes while it's showing.
+const useUndoToast = () => {
+  const [toast, setToast] = useState(null);
+  const timer = useRef(null);
+  const showToast = (msg, undo) => {
+    clearTimeout(timer.current);
+    setToast({
+      msg,
+      undo,
+      id: Date.now()
+    });
+    timer.current = setTimeout(() => setToast(null), 8000);
+  };
+  const runUndo = () => {
+    if (toast && toast.undo) toast.undo();
+    clearTimeout(timer.current);
+    setToast(null);
+  };
+  useEffect(() => {
+    if (!toast || !toast.undo) return;
+    const key = e => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !isTyping(e.target)) {
+        e.preventDefault();
+        runUndo();
+      }
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [toast]);
+  return {
+    toast,
+    showToast,
+    runUndo
+  };
+};
+const ToastPill = ({
+  toast,
+  onUndo
+}) => /*#__PURE__*/React.createElement("div", {
+  key: toast.id,
+  style: {
+    pointerEvents: 'auto',
+    animation: 'float-in 0.18s ease',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    padding: '9px 10px 9px 16px',
+    background: 'rgba(13,28,54,0.97)',
+    border: '1px solid rgba(255,255,255,0.16)',
+    borderRadius: '12px',
+    boxShadow: '0 16px 40px rgba(0,0,0,0.55)',
+    color: '#fff',
+    fontSize: '12.5px',
+    fontWeight: '600'
+  }
+}, toast.msg, toast.undo && /*#__PURE__*/React.createElement("button", {
+  onClick: onUndo,
+  title: "Undo (⌘Z)",
+  style: {
+    padding: '6px 12px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    background: 'rgba(96,165,250,0.15)',
+    border: '1px solid rgba(96,165,250,0.35)',
+    color: '#60a5fa',
+    fontSize: '12px',
+    fontWeight: '800'
+  }
+}, "Undo"));
+
+// Team balance: talls = non-midfielders 193cm+ (rucks included)
+const teamBalance = (selected, fieldCount) => {
+  const avg = xs => xs.reduce((s, x) => s + x, 0) / xs.length;
+  const comp = selected.length ? {
+    age: avg(selected.map(p => calculateAge(p.dob))),
+    height: avg(selected.map(p => p.height)),
+    talls: selected.filter(p => p.height >= 193 && p.position !== 'MID').length,
+    rucks: selected.filter(p => p.position === 'RUCK').length
+  } : null;
+  const warnings = [];
+  if (fieldCount > 18) warnings.push(`${fieldCount} on the field (max 18)`);
+  if (comp && selected.length >= 18 && comp.rucks === 0) warnings.push('No ruck selected');
+  if (comp && comp.rucks >= 3) warnings.push(`${comp.rucks} rucks selected`);
+  if (comp && comp.talls >= 9) warnings.push(`${comp.talls} talls: top-heavy`);
+  return {
+    comp,
+    warnings
+  };
+};
+
+// Named team-sheet slots. x/y are board percentages (FB end at the top), so a team picked
+// on the phone lands sensibly on the magnet board and vice versa. Followers sit just above
+// the centre line on the board but are listed last, the way team sheets read.
+const TEAM_LINES = [{
+  key: 'B',
+  label: 'BACKS',
+  short: 'B',
+  slots: [{
+    key: 'LBP',
+    pos: 'BP',
+    x: 15,
+    y: 10
+  }, {
+    key: 'FB',
+    pos: 'FB',
+    x: 50,
+    y: 8
+  }, {
+    key: 'RBP',
+    pos: 'BP',
+    x: 85,
+    y: 10
+  }]
+}, {
+  key: 'HB',
+  label: 'HALF BACKS',
+  short: 'HB',
+  slots: [{
+    key: 'LHB',
+    pos: 'HBF',
+    x: 13,
+    y: 26
+  }, {
+    key: 'CHB',
+    pos: 'CHB',
+    x: 50,
+    y: 24
+  }, {
+    key: 'RHB',
+    pos: 'HBF',
+    x: 87,
+    y: 26
+  }]
+}, {
+  key: 'C',
+  label: 'CENTRES',
+  short: 'C',
+  slots: [{
+    key: 'LW',
+    pos: 'W',
+    x: 11,
+    y: 56
+  }, {
+    key: 'C',
+    pos: 'C',
+    x: 50,
+    y: 57
+  }, {
+    key: 'RW',
+    pos: 'W',
+    x: 89,
+    y: 56
+  }]
+}, {
+  key: 'HF',
+  label: 'HALF FORWARDS',
+  short: 'HF',
+  slots: [{
+    key: 'LHF',
+    pos: 'HFF',
+    x: 13,
+    y: 74
+  }, {
+    key: 'CHF',
+    pos: 'CHF',
+    x: 50,
+    y: 76
+  }, {
+    key: 'RHF',
+    pos: 'HFF',
+    x: 87,
+    y: 74
+  }]
+}, {
+  key: 'F',
+  label: 'FORWARDS',
+  short: 'F',
+  slots: [{
+    key: 'LFP',
+    pos: 'FP',
+    x: 15,
+    y: 90
+  }, {
+    key: 'FF',
+    pos: 'FF',
+    x: 50,
+    y: 92
+  }, {
+    key: 'RFP',
+    pos: 'FP',
+    x: 85,
+    y: 90
+  }]
+}, {
+  key: 'FOL',
+  label: 'FOLLOWERS',
+  short: 'FOL',
+  slots: [{
+    key: 'R',
+    pos: 'R',
+    x: 50,
+    y: 39
+  }, {
+    key: 'RR',
+    pos: 'RR',
+    x: 19,
+    y: 41
+  }, {
+    key: 'ROV',
+    pos: 'ROV',
+    x: 81,
+    y: 41
+  }]
+}];
+const TEAM_SLOTS = TEAM_LINES.flatMap(l => l.slots);
+const BENCH_SIZE = 5;
+const playerById = id => S_PLAYERS.find(p => p.id === id);
+const surname = p => p.name.split(' ').slice(1).join(' ') || p.name;
+
+// Board -> named slots: each field magnet takes the nearest free slot, closest pairs first.
+// More than 18 on the field (possible on the desktop board) leaves the rest in `extra`.
+const slotsFromBoard = board => {
+  const field = Object.entries(board).filter(([id, p]) => !p.isInterchange && playerById(+id)).map(([id, p]) => ({
+    id: +id,
+    x: p.x,
+    y: p.y
+  }));
+  const pairs = [];
+  field.forEach(f => TEAM_SLOTS.forEach(s => pairs.push([Math.hypot(f.x - s.x, (f.y - s.y) * 1.17), f.id, s.key])));
+  pairs.sort((a, b) => a[0] - b[0]);
+  const slots = {},
+    placed = new Set();
+  pairs.forEach(([, id, key]) => {
+    if (!slots[key] && !placed.has(id)) {
+      slots[key] = id;
+      placed.add(id);
+    }
+  });
+  const bench = Array.from({
+    length: BENCH_SIZE
+  }, (_, i) => {
+    const hit = Object.entries(board).find(([id, p]) => p.isInterchange && p.slot === i && playerById(+id));
+    return hit ? +hit[0] : null;
+  });
+  return {
+    slots,
+    bench,
+    extra: field.filter(f => !placed.has(f.id)).map(f => f.id)
+  };
+};
+
+// Named slots -> board, snapping everyone to their slot's spot on the ground
+const boardFromSlots = ({
+  slots,
+  bench,
+  extra
+}, prev) => {
+  const b = {};
+  TEAM_SLOTS.forEach(s => {
+    if (slots[s.key]) b[slots[s.key]] = {
+      x: s.x,
+      y: s.y
+    };
+  });
+  bench.forEach((id, i) => {
+    if (id) b[id] = {
+      isInterchange: true,
+      slot: i
+    };
+  });
+  extra.forEach(id => {
+    if (prev[id]) b[id] = prev[id];
+  });
+  return b;
+};
+const teamSheetLines = board => {
+  const {
+    slots,
+    bench,
+    extra
+  } = slotsFromBoard(board);
+  return {
+    lines: TEAM_LINES.map(l => ({
+      label: l.label,
+      short: l.short,
+      players: l.slots.map(s => playerById(slots[s.key])).filter(Boolean)
+    })),
+    bench: bench.map(playerById).filter(Boolean),
+    extra: extra.map(playerById).filter(Boolean)
+  };
+};
+
+// 'B: Saad, Weitering, Newman' etc., for pasting into a group chat
+const teamText = board => {
+  const {
+    lines,
+    bench
+  } = teamSheetLines(board);
+  const nm = p => surname(p) + (p.captain ? ' (c)' : '');
+  return [`Carlton ${S_YEAR}: my best 23`, ...lines.filter(l => l.players.length).map(l => `${l.short}: ${l.players.map(nm).join(', ')}`), bench.length ? `I/C: ${bench.map(nm).join(', ')}` : null].filter(Boolean).join('\n');
+};
+const downloadBlob = (blob, name) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+const drawTeamSheet = (lines, benchPlayers) => {
+  const W = 1000,
+    H = 340 + lines.length * 130 + (benchPlayers.length ? 170 : 60);
+  const scale = 2;
+  const cv = document.createElement('canvas');
+  cv.width = W * scale;
+  cv.height = H * scale;
+  const ctx = cv.getContext('2d');
+  ctx.scale(scale, scale);
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0b1729');
+  bg.addColorStop(1, '#04080f');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(24, 24, W - 48, H - 48);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '600 48px Oswald, Inter, sans-serif';
+  ctx.fillText('C A R L T O N', W / 2, 112);
+  ctx.font = '700 19px Inter, sans-serif';
+  ctx.fillStyle = '#60a5fa';
+  ctx.fillText(`${String(S_YEAR).split('').join(' ')}   T E A M   S H E E T`, W / 2, 148);
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.beginPath();
+  ctx.moveTo(90, 180);
+  ctx.lineTo(W - 90, 180);
+  ctx.stroke();
+  const drawPlayer = (pl, cx, cy) => {
+    const num = String(numLabel(pl));
+    const name = pl.name + (pl.captain ? ' (c)' : '');
+    ctx.font = '600 23px Oswald, Inter, sans-serif';
+    const numW = ctx.measureText(num).width;
+    ctx.font = '700 21px Inter, sans-serif';
+    const nameW = ctx.measureText(name).width;
+    const gap = 9;
+    let x = cx - (numW + gap + nameW) / 2;
+    ctx.textAlign = 'left';
+    ctx.font = '600 23px Oswald, Inter, sans-serif';
+    ctx.fillStyle = '#60a5fa';
+    ctx.fillText(num, x, cy);
+    ctx.font = '700 21px Inter, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(name, x + numW + gap, cy);
+    ctx.textAlign = 'center';
+  };
+  let y = 245;
+  lines.forEach(line => {
+    ctx.font = '800 13px Inter, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillText(line.label.split('').join(' '), W / 2, y);
+    const cols = line.players.length;
+    line.players.forEach((pl, i) => {
+      const cx = W * (i + 1) / (cols + 1);
+      drawPlayer(pl, cx, y + 42);
+    });
+    y += 130;
+  });
+  if (benchPlayers.length) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.beginPath();
+    ctx.moveTo(90, y - 20);
+    ctx.lineTo(W - 90, y - 20);
+    ctx.stroke();
+    ctx.font = '800 13px Inter, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillText('I N T E R C H A N G E', W / 2, y + 18);
+    benchPlayers.forEach((pl, i) => {
+      const cx = W * (i + 1) / (benchPlayers.length + 1);
+      drawPlayer(pl, cx, y + 62);
+    });
+    y += 110;
+  }
+  ctx.font = '600 12px Inter, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.fillText(new Date().toLocaleDateString('en-AU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  }), W / 2, H - 44);
+  return cv;
+};
+
+// Team-sheet PNG. Lines come from the named slots, so followers around the centre square
+// are labelled followers (the old top-to-bottom split called them half forwards).
+// share=true uses the phone's share sheet where it takes files, else it downloads.
+const saveTeamSheet = (board, share) => {
+  const {
+    lines,
+    bench
+  } = teamSheetLines(board);
+  const drawn = lines.filter(l => l.players.length);
+  if (!drawn.length && !bench.length) {
+    alert('Pick some players first — the team sheet is built from your selection.');
+    return;
+  }
+  const cv = drawTeamSheet(drawn, bench);
+  const name = `carlton-team-sheet-${new Date().toISOString().slice(0, 10)}.png`;
+  // Built synchronously so navigator.share still counts as part of the tap (Safari insists)
+  const bin = atob(cv.toDataURL('image/png').split(',')[1]);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const blob = new Blob([bytes], {
+    type: 'image/png'
+  });
+  const file = typeof File === 'function' ? new File([blob], name, {
+    type: 'image/png'
+  }) : null;
+  if (share && file && navigator.canShare && navigator.canShare({
+    files: [file]
+  })) {
+    navigator.share({
+      files: [file],
+      title: `Carlton ${S_YEAR} team`
+    }).catch(err => {
+      if (!err || err.name !== 'AbortError') downloadBlob(blob, name);
+    });
+    return;
+  }
+  downloadBlob(blob, name);
+};
+
+// v2 backs up every season (v1 only saved the one on screen, so backing up from 2027
+// silently skipped 2026's votes). Top-level votes/ratings/board stay as v1 had them.
+const downloadBackup = current => {
+  const read = key => {
+    try {
+      return JSON.parse(localStorage.getItem(key)) || {};
     } catch {
       return {};
     }
+  };
+  const seasons = {};
+  Object.keys(SEASONS).forEach(y => {
+    seasons[y] = String(S_YEAR) === y ? current : {
+      votes: read(`carlton-bf-${y}`),
+      ratings: read(`carlton-wheelo-${y}`),
+      board: read(`carlton-board-${y}`)
+    };
   });
+  const data = {
+    app: 'carlton-magnetboard',
+    version: 2,
+    exported: new Date().toISOString(),
+    season: S_YEAR,
+    votes: current.votes,
+    ratings: current.ratings,
+    board: current.board,
+    seasons
+  };
+  downloadBlob(new Blob([JSON.stringify(data, null, 2)], {
+    type: 'application/json'
+  }), `carlton-backup-${new Date().toISOString().slice(0, 10)}.json`);
+};
+
+// File-input change handler. applyHere(d) loads the on-screen season's part into state.
+const restoreBackupFile = (e, applyHere) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try {
+      data = JSON.parse(reader.result);
+      if (!data || !data.votes && !data.ratings && !data.board && !data.seasons) throw new Error('empty');
+    } catch {
+      alert('Could not read that file — expected a Carlton magnetboard backup (.json).');
+      return;
+    }
+    const when = data.exported ? new Date(data.exported).toLocaleDateString('en-AU', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    }) : 'unknown date';
+    if (data.seasons) {
+      const years = Object.keys(data.seasons).filter(y => SEASONS[y]);
+      if (!confirm(`Restore votes, ratings and boards for ${years.join(' and ')} from this backup (saved ${when})?\n\nThis replaces what's currently saved in this browser for those seasons.`)) return;
+      years.forEach(y => {
+        const d = data.seasons[y];
+        if (y === String(S_YEAR)) {
+          applyHere(d);
+          return;
+        }
+        try {
+          if (d.votes) {
+            const st = loadJSON(stampsKey(y));
+            stampChanges(loadJSON(`carlton-bf-${y}`), d.votes, st, Date.now());
+            localStorage.setItem(stampsKey(y), JSON.stringify(st));
+            localStorage.setItem(`carlton-bf-${y}`, JSON.stringify(d.votes));
+          }
+          if (d.ratings) localStorage.setItem(`carlton-wheelo-${y}`, JSON.stringify(d.ratings));
+          if (d.board) localStorage.setItem(`carlton-board-${y}`, JSON.stringify(d.board));
+        } catch {}
+      });
+    } else {
+      // v1 files don't say which season they hold
+      if (!confirm(`This backup (saved ${when}) doesn't record which season it's from.\n\nRestore it into ${S_YEAR}, replacing your current ${S_YEAR} votes, ratings and board? If it's from another season, cancel and switch seasons first.`)) return;
+      applyHere(data);
+    }
+    alert('Backup restored.');
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+};
+
+// ---- Vote sync between devices (phone ⇄ Mac) through a private GitHub gist ----
+// Votes stay in localStorage exactly as before. Sync also keeps the time every vote was
+// last set or cleared (carlton-bf-stamps-<year>) and merges vote by vote, newest wins, so
+// voting on both devices between syncs loses nothing. Needs a token with only `gist` scope.
+const SYNC_KEY = 'carlton-sync';
+const SYNC_FILE = 'carlton-votes.json';
+const GH_API = 'https://api.github.com';
+const TOKEN_URL = 'https://github.com/settings/tokens/new?scopes=gist&description=Carlton%20Magnetboard%20vote%20sync';
+const stampsKey = y => `carlton-bf-stamps-${y}`;
+const loadSync = () => {
+  try {
+    return JSON.parse(localStorage.getItem(SYNC_KEY)) || null;
+  } catch {
+    return null;
+  }
+};
+const saveSync = cfg => {
+  try {
+    if (cfg) localStorage.setItem(SYNC_KEY, JSON.stringify(cfg));else localStorage.removeItem(SYNC_KEY);
+  } catch {}
+};
+// JSON with sorted keys, so "nothing changed" checks don't depend on key order
+const stableJSON = o => JSON.stringify(o, (k, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v).sort().reduce((acc, key) => {
+  acc[key] = v[key];
+  return acc;
+}, {}) : v);
+const ghFetch = async (token, path, opts = {}) => {
+  const res = await fetch(GH_API + path, {
+    method: opts.method || 'GET',
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      ...(opts.body ? {
+        'Content-Type': 'application/json'
+      } : {})
+    },
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  });
+  if (!res.ok) {
+    throw new Error(res.status === 401 ? 'GitHub didn’t accept the token (expired or revoked?)' : res.status === 404 ? 'The sync gist is gone, or this token can’t see it' : `GitHub error ${res.status}`);
+  }
+  return res.json();
+};
+
+// Vote cells: { 'playerId|round': [score, or null once cleared, lastChangedMs] }.
+// Votes made before sync existed have no stamp (0).
+const voteKeys = votes => {
+  const ks = [];
+  Object.entries(votes || {}).forEach(([pid, rs]) => Object.keys(rs || {}).forEach(r => ks.push(`${pid}|${r}`)));
+  return ks;
+};
+const cellVal = (votes, k) => {
+  const [pid, r] = k.split('|');
+  const v = votes && votes[pid] ? votes[pid][r] : undefined;
+  return v === undefined ? null : v;
+};
+const stampChanges = (before, after, stamps, now) => {
+  let changed = false;
+  new Set([...voteKeys(before), ...voteKeys(after)]).forEach(k => {
+    if (cellVal(before, k) !== cellVal(after, k)) {
+      stamps[k] = now;
+      changed = true;
+    }
+  });
+  return changed;
+};
+const toCells = (votes, stamps) => {
+  const cells = {};
+  voteKeys(votes).forEach(k => {
+    const v = cellVal(votes, k);
+    if (v !== null) cells[k] = [v, stamps[k] || 0];
+  });
+  Object.keys(stamps).forEach(k => {
+    if (!cells[k]) cells[k] = [null, stamps[k]];
+  });
+  return cells;
+};
+const fromCells = cells => {
+  const votes = {},
+    stamps = {};
+  Object.entries(cells).forEach(([k, [v, ts]]) => {
+    if (ts) stamps[k] = ts;
+    if (v === null) return;
+    const [pid, r] = k.split('|');
+    (votes[pid] = votes[pid] || {})[r] = v;
+  });
+  return {
+    votes,
+    stamps
+  };
+};
+// Newest wins per vote. On a tie (both unstamped) `b` wins unless `strict`.
+const mergeCells = (a, b, strict) => {
+  const out = {
+    ...a
+  };
+  Object.entries(b || {}).forEach(([k, c]) => {
+    if (!out[k] || c[1] > out[k][1] || !strict && c[1] === out[k][1]) out[k] = c;
+  });
+  return out;
+};
+
+// Reuse the gist another device made (same GitHub account), or make one. Returns the login.
+const connectSync = async rawToken => {
+  const token = rawToken.trim();
+  const user = await ghFetch(token, '/user');
+  const mine = await ghFetch(token, '/gists?per_page=100');
+  let gist = mine.find(g => g.files && g.files[SYNC_FILE]);
+  if (!gist) {
+    gist = await ghFetch(token, '/gists', {
+      method: 'POST',
+      body: {
+        description: 'Carlton Magnetboard B&F votes (synced by the app)',
+        public: false,
+        files: {
+          [SYNC_FILE]: {
+            content: JSON.stringify({
+              app: 'carlton-magnetboard',
+              version: 1,
+              seasons: {}
+            })
+          }
+        }
+      }
+    });
+  }
+  saveSync({
+    token,
+    gistId: gist.id,
+    login: user.login,
+    last: 0
+  });
+  return user.login;
+};
+
+// Pull, merge, push if anything's new. `cur` is the on-screen season's live { votes, stamps };
+// other seasons merge straight into localStorage. Returns the merged cells for `cur`.
+// Unstamped ties go to the gist, so set up the device holding the real votes first.
+const syncVotes = async cur => {
+  const cfg = loadSync();
+  if (!cfg) return null;
+  const gist = await ghFetch(cfg.token, `/gists/${cfg.gistId}`);
+  let remote = {};
+  try {
+    remote = JSON.parse(gist.files[SYNC_FILE].content).seasons || {};
+  } catch {}
+  const seasons = {
+    ...remote
+  };
+  let dirty = false,
+    curCells = null;
+  Object.keys(SEASONS).forEach(y => {
+    const here = String(S_YEAR) === y;
+    const local = here ? toCells(cur.votes, cur.stamps) : toCells(loadJSON(`carlton-bf-${y}`), loadJSON(stampsKey(y)));
+    const merged = mergeCells(local, remote[y]);
+    if (stableJSON(merged) !== stableJSON(remote[y] || {})) dirty = true;
+    seasons[y] = merged;
+    if (here) {
+      curCells = merged;
+      return;
+    }
+    const {
+      votes,
+      stamps
+    } = fromCells(merged);
+    try {
+      localStorage.setItem(`carlton-bf-${y}`, JSON.stringify(votes));
+      localStorage.setItem(stampsKey(y), JSON.stringify(stamps));
+    } catch {}
+  });
+  if (dirty) {
+    await ghFetch(cfg.token, `/gists/${cfg.gistId}`, {
+      method: 'PATCH',
+      body: {
+        files: {
+          [SYNC_FILE]: {
+            content: JSON.stringify({
+              app: 'carlton-magnetboard',
+              version: 1,
+              updated: new Date().toISOString(),
+              seasons
+            })
+          }
+        }
+      }
+    });
+  }
+  saveSync({
+    ...loadSync(),
+    last: Date.now()
+  });
+  return curCells;
+};
+
+// Stamps this device's vote changes, pushes ~1.5s after them, and pulls on open/foreground
+const useVoteSync = (votes, setVotes) => {
+  const [status, setStatus] = useState(() => {
+    const c = loadSync();
+    return c ? {
+      state: 'idle',
+      last: c.last
+    } : null;
+  });
+  const stamps = useRef(loadJSON(stampsKey(S_YEAR)));
+  const prev = useRef(votes);
+  const live = useRef(votes);
+  live.current = votes;
+  const fromSync = useRef(false);
+  const busy = useRef(false),
+    again = useRef(false),
+    timer = useRef(null);
+  const run = async () => {
+    if (!loadSync()) {
+      setStatus(null);
+      return;
+    }
+    if (busy.current) {
+      again.current = true;
+      return;
+    }
+    busy.current = true;
+    setStatus(s => ({
+      ...(s || {}),
+      state: 'syncing'
+    }));
+    try {
+      const merged = await syncVotes({
+        votes: live.current,
+        stamps: stamps.current
+      });
+      // Votes made while that request was out are newer than anything it brought back
+      const {
+        votes: nv,
+        stamps: ns
+      } = fromCells(mergeCells(merged, toCells(live.current, stamps.current), true));
+      stamps.current = ns;
+      try {
+        localStorage.setItem(stampsKey(S_YEAR), JSON.stringify(ns));
+      } catch {}
+      if (stableJSON(nv) !== stableJSON(fromCells(toCells(live.current, {})).votes)) {
+        fromSync.current = true;
+        setVotes(nv);
+      }
+      setStatus({
+        state: 'ok',
+        last: Date.now()
+      });
+    } catch (e) {
+      const msg = e && e.message === 'Failed to fetch' ? 'Couldn’t reach GitHub (offline?)' : e && e.message || 'Sync failed';
+      setStatus({
+        state: 'error',
+        msg,
+        last: (loadSync() || {}).last
+      });
+    }
+    busy.current = false;
+    if (again.current) {
+      again.current = false;
+      run();
+    }
+  };
+  const runRef = useRef(run);
+  runRef.current = run;
+  useEffect(() => {
+    const before = prev.current;
+    prev.current = votes;
+    if (fromSync.current) {
+      fromSync.current = false;
+      return;
+    }
+    if (before === votes) return;
+    if (stampChanges(before, votes, stamps.current, Date.now())) {
+      try {
+        localStorage.setItem(stampsKey(S_YEAR), JSON.stringify(stamps.current));
+      } catch {}
+      if (loadSync()) {
+        clearTimeout(timer.current);
+        timer.current = setTimeout(() => runRef.current(), 1500);
+      }
+    }
+  }, [votes]);
+
+  // Pull on open, on coming back to the front, and every minute while on screen
+  // (a board left open on the Mac never gets a focus event)
+  useEffect(() => {
+    runRef.current();
+    const wake = () => {
+      if (document.visibilityState === 'visible') runRef.current();
+    };
+    document.addEventListener('visibilitychange', wake);
+    window.addEventListener('focus', wake);
+    const tick = setInterval(wake, 60000);
+    return () => {
+      document.removeEventListener('visibilitychange', wake);
+      window.removeEventListener('focus', wake);
+      clearInterval(tick);
+      clearTimeout(timer.current);
+    };
+  }, []);
+  const refresh = () => {
+    const c = loadSync();
+    setStatus(c ? {
+      state: 'idle',
+      last: c.last
+    } : null);
+  };
+  return {
+    status,
+    syncNow: () => runRef.current(),
+    refresh
+  };
+};
+const ago = ms => {
+  if (!ms) return 'not yet';
+  const s = Math.round((Date.now() - ms) / 1000);
+  if (s < 45) return 'just now';
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+  return new Date(ms).toLocaleDateString('en-AU', {
+    day: 'numeric',
+    month: 'short'
+  });
+};
+const syncColor = st => !st ? 'rgba(255,255,255,0.55)' : st.state === 'error' ? '#f87171' : st.state === 'syncing' ? '#fbbf24' : '#4ade80';
+const syncLabel = st => !st ? 'Sync votes' : st.state === 'error' ? 'Sync failed' : st.state === 'syncing' ? 'Syncing…' : 'Synced';
+
+// Connect / status / disconnect. Shared by the desktop modal and the phone sheet.
+const SyncPanel = ({
+  sync
+}) => {
+  const cfg = loadSync();
+  const [token, setToken] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const st = sync.status;
+  const para = {
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: '13.5px',
+    lineHeight: 1.5,
+    marginBottom: '12px'
+  };
+  const btn = primary => ({
+    padding: '11px 16px',
+    borderRadius: '10px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '700',
+    background: primary ? 'linear-gradient(135deg, #ffffff 0%, #dce5f2 100%)' : 'rgba(255,255,255,0.08)',
+    color: primary ? CARLTON_NAVY : '#fff',
+    border: primary ? 'none' : '1px solid rgba(255,255,255,0.14)'
+  });
+  const connect = async () => {
+    if (!token.trim()) return;
+    setBusy(true);
+    setErr('');
+    try {
+      await connectSync(token);
+      setToken('');
+      sync.refresh();
+      sync.syncNow();
+    } catch (e) {
+      setErr(e && e.message === 'Failed to fetch' ? 'Couldn’t reach GitHub. Check your connection.' : e && e.message || 'Couldn’t connect');
+    }
+    setBusy(false);
+  };
+  if (cfg) {
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        marginBottom: '6px'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: '9px',
+        height: '9px',
+        borderRadius: '50%',
+        background: syncColor(st)
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: '#fff',
+        fontSize: '15px',
+        fontWeight: '700'
+      }
+    }, "Connected as @", cfg.login)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        ...para,
+        color: st && st.state === 'error' ? '#f87171' : para.color
+      }
+    }, st && st.state === 'error' ? st.msg : st && st.state === 'syncing' ? 'Syncing…' : `Last synced ${ago(st ? st.last : cfg.last)}`), /*#__PURE__*/React.createElement("div", {
+      style: para
+    }, "Votes sync automatically: a moment after you vote, when the app opens or comes back to the front, and every minute while it's on screen. Every season syncs, not just the one showing."), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: '8px'
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => sync.syncNow(),
+      style: {
+        ...btn(true),
+        flex: 1
+      }
+    }, "Sync now"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        if (!confirm('Stop syncing on this device? Votes already here stay here.')) return;
+        saveSync(null);
+        sync.refresh();
+      },
+      style: btn(false)
+    }, "Disconnect")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        ...para,
+        fontSize: '12px',
+        marginTop: '12px',
+        marginBottom: 0,
+        color: 'rgba(255,255,255,0.4)'
+      }
+    }, "The votes live in a private gist on your GitHub account (gist.github.com)."));
+  }
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: para
+  }, "Keep B&F votes the same on your phone and computer. They're stored in a private gist on your GitHub account, and each device needs a GitHub token that can only read and write gists."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: '#fff',
+      fontSize: '13.5px',
+      fontWeight: '700',
+      marginBottom: '6px'
+    }
+  }, "1. Make a gist-only token"), /*#__PURE__*/React.createElement("div", {
+    style: para
+  }, /*#__PURE__*/React.createElement("a", {
+    href: TOKEN_URL,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    style: {
+      color: '#60a5fa',
+      fontWeight: '700'
+    }
+  }, "Open GitHub’s token page ↗"), ". Only “gist” is ticked: leave it that way, pick an expiry, then Generate token and copy it."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: '#fff',
+      fontSize: '13.5px',
+      fontWeight: '700',
+      marginBottom: '6px'
+    }
+  }, "2. Paste it here"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '8px',
+      marginBottom: '10px'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "password",
+    value: token,
+    onChange: e => setToken(e.target.value),
+    onKeyDown: e => {
+      if (e.key === 'Enter') connect();
+    },
+    placeholder: "ghp_…",
+    autoComplete: "off",
+    spellCheck: false,
+    style: {
+      flex: 1,
+      minWidth: 0,
+      padding: '11px 12px',
+      borderRadius: '10px',
+      background: 'rgba(255,255,255,0.06)',
+      border: '1px solid rgba(255,255,255,0.14)',
+      color: '#fff',
+      fontSize: '16px',
+      fontFamily: 'Inter, sans-serif',
+      outline: 'none'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: connect,
+    disabled: busy || !token.trim(),
+    style: {
+      ...btn(true),
+      opacity: busy || !token.trim() ? 0.5 : 1
+    }
+  }, busy ? 'Connecting…' : 'Connect')), err && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...para,
+      color: '#f87171'
+    }
+  }, err), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: '#fff',
+      fontSize: '13.5px',
+      fontWeight: '700',
+      marginBottom: '6px'
+    }
+  }, "3. Repeat on your other device"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...para,
+      marginBottom: 0
+    }
+  }, "Same token or a second one: both find the same gist. Connect the computer first so the votes already on it go up first."));
+};
+
+// Centred dialog for the desktop board
+const Modal = ({
+  title,
+  onClose,
+  children
+}) => {
+  useEffect(() => {
+    const key = e => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [onClose]);
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: onClose,
+    style: {
+      position: 'fixed',
+      inset: 0,
+      zIndex: 4000,
+      background: 'rgba(2,6,14,0.6)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      animation: 'fade-in 0.15s ease'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    onClick: e => e.stopPropagation(),
+    style: {
+      width: '460px',
+      maxWidth: 'calc(100% - 32px)',
+      padding: '20px 22px 22px',
+      background: `linear-gradient(160deg, ${CARLTON_NAVY_LIGHT} 0%, ${CARLTON_NAVY} 55%, ${CARLTON_NAVY_DARK} 100%)`,
+      border: '1px solid rgba(255,255,255,0.14)',
+      borderRadius: '18px',
+      boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
+      animation: 'float-in 0.18s ease'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: '14px'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#fff',
+      fontSize: '18px',
+      fontWeight: '800'
+    }
+  }, title), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    style: {
+      padding: '6px 13px',
+      borderRadius: '999px',
+      border: 'none',
+      cursor: 'pointer',
+      background: 'rgba(255,255,255,0.1)',
+      color: '#fff',
+      fontSize: '13px',
+      fontWeight: '700'
+    }
+  }, "Done")), children));
+};
+function App({
+  onSeason
+}) {
+  const [fieldPlayers, setFieldPlayers] = useState(() => loadJSON(`carlton-board-${S_YEAR}`));
   const [dragging, setDragging] = useState(null);
   const [filter, setFilter] = useState('ALL');
   const fieldRef = useRef(null);
   const dragRef = useRef(false);
-  const [votes, setVotes] = useState(() => {
-    try {
-      const saved = localStorage.getItem('carlton-bf-2026');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [votes, setVotes] = useState(() => loadJSON(`carlton-bf-${S_YEAR}`));
   const [selectedRound, setSelectedRound] = useState('OR');
   const [bfView, setBfView] = useState('vote');
-  const [ratings, setRatings] = useState(() => {
-    try {
-      const saved = localStorage.getItem('carlton-wheelo-2026');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Merge seed OR ratings if not already stored
-        // Always overwrite seeded rounds with correct data
-        const seeds = buildSeedRatings();
-        // Versioned seeding: bundled rounds are written once per seed version,
-        // after that user-imported data is never clobbered on load.
-        const SEED_VERSION = '2';
-        let storedVer = null;
-        try {
-          storedVer = localStorage.getItem('carlton-seed-version');
-        } catch {}
-        if (storedVer !== SEED_VERSION) {
-          Object.keys(seeds).forEach(r => {
-            parsed[r] = seeds[r];
-          });
-          try {
-            localStorage.setItem('carlton-seed-version', SEED_VERSION);
-          } catch {}
-        } else {
-          Object.keys(seeds).forEach(r => {
-            if (!parsed[r]) parsed[r] = seeds[r];
-          });
-        }
-        return parsed;
-      }
-      return buildSeedRatings();
-    } catch {
-      return buildSeedRatings();
-    }
-  });
+  const [ratings, setRatings] = useState(loadRatings);
   useEffect(() => {
     try {
-      localStorage.setItem('carlton-bf-2026', JSON.stringify(votes));
+      localStorage.setItem(`carlton-bf-${S_YEAR}`, JSON.stringify(votes));
     } catch {}
   }, [votes]);
   useEffect(() => {
     try {
-      localStorage.setItem('carlton-board-2026', JSON.stringify(fieldPlayers));
+      localStorage.setItem(`carlton-board-${S_YEAR}`, JSON.stringify(fieldPlayers));
     } catch {}
   }, [fieldPlayers]);
   useEffect(() => {
     try {
-      localStorage.setItem('carlton-wheelo-2026', JSON.stringify(ratings));
+      localStorage.setItem(`carlton-wheelo-${S_YEAR}`, JSON.stringify(ratings));
     } catch {}
   }, [ratings]);
-  const filtered = CARLTON_PLAYERS.filter(p => filter === 'ALL' || p.position === filter);
+  const [query, setQuery] = useState('');
+  const q = query.trim();
+  const matchesQuery = p => !q || (/^\d+$/.test(q) ? String(p.number) === q : normName(p.name).includes(normName(q)));
+  const filtered = S_PLAYERS.filter(p => (filter === 'ALL' || p.position === filter) && matchesQuery(p));
   const bench = filtered.filter(p => !fieldPlayers[p.id]).sort((a, b) => a.number - b.number);
+  const selectedPlayers = S_PLAYERS.filter(p => fieldPlayers[p.id]);
   const interchangeCount = Object.values(fieldPlayers).filter(p => p.isInterchange).length;
   const onFieldCount = Object.keys(fieldPlayers).length - interchangeCount;
+
+  // --- Undo toast (clear board, remove player) ---
+  const {
+    toast,
+    showToast,
+    runUndo
+  } = useUndoToast();
+
+  // --- Vote sync with the phone ---
+  const sync = useVoteSync(votes, setVotes);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const closeSync = useCallback(() => setSyncOpen(false), []);
+
+  // Board edits that touch-drag handlers (registered once) can call: read live state via ref
+  const boardRef = useRef(fieldPlayers);
+  boardRef.current = fieldPlayers;
+  const freeBenchSlot = fp => [0, 1, 2, 3, 4].find(sl => !Object.values(fp).some(pp => pp.isInterchange && pp.slot === sl));
+  const removePlayer = player => {
+    const was = boardRef.current[player.id];
+    if (!was) return;
+    setFieldPlayers(prev => {
+      const n = {
+        ...prev
+      };
+      delete n[player.id];
+      return n;
+    });
+    showToast(`${player.name} removed`, () => setFieldPlayers(prev => {
+      if (prev[player.id]) return prev;
+      if (was.isInterchange && freeBenchSlot(prev) === undefined) return prev;
+      const slotTaken = was.isInterchange && Object.values(prev).some(pp => pp.isInterchange && pp.slot === was.slot);
+      return {
+        ...prev,
+        [player.id]: slotTaken ? {
+          isInterchange: true,
+          slot: freeBenchSlot(prev)
+        } : was
+      };
+    }));
+  };
+  const moveToBench = player => setFieldPlayers(prev => {
+    const slot = freeBenchSlot(prev);
+    if (slot === undefined) return prev;
+    return {
+      ...prev,
+      [player.id]: {
+        isInterchange: true,
+        slot
+      }
+    };
+  });
+  const clearBoard = () => {
+    const snapshot = fieldPlayers;
+    const n = Object.keys(snapshot).length;
+    if (!n) return;
+    setFieldPlayers({});
+    showToast(`Board cleared (${n} player${n === 1 ? '' : 's'})`, () => setFieldPlayers(snapshot));
+  };
+
+  // --- Player card (single click; a double-click still removes) ---
+  const [card, setCard] = useState(null);
+  const cardTimer = useRef(null);
+  const downAt = useRef(null);
+  const closeCard = useCallback(() => setCard(null), []);
+  const openCard = (e, player, delay = 0) => {
+    if (e.detail > 1) return;
+    // Field magnets follow the mouse while held, so a click that moved was really a nudge
+    if (delay && downAt.current && Math.hypot(e.clientX - downAt.current.x, e.clientY - downAt.current.y) > 4) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    clearTimeout(cardTimer.current);
+    cardTimer.current = setTimeout(() => setCard({
+      player,
+      rect
+    }), delay);
+  };
+  const removeOnDblClick = player => {
+    clearTimeout(cardTimer.current);
+    setCard(null);
+    removePlayer(player);
+  };
   const handleMouseMove = useCallback(e => {
     if (!dragRef.current || !dragging || !fieldRef.current) return;
     const rect = fieldRef.current.getBoundingClientRect();
@@ -2468,13 +4361,13 @@ function App() {
   // --- Results (baked into data.js, refreshed via Squiggle) ---
   const [results, setResults] = useState(() => {
     try {
-      const saved = localStorage.getItem('carlton-results-2026');
+      const saved = localStorage.getItem(`carlton-results-${S_YEAR}`);
       return saved ? {
-        ...RESULTS_2026,
+        ...S_RESULTS,
         ...JSON.parse(saved)
-      } : RESULTS_2026;
+      } : S_RESULTS;
     } catch {
-      return RESULTS_2026;
+      return S_RESULTS;
     }
   });
   const [syncState, setSyncState] = useState('');
@@ -2485,7 +4378,7 @@ function App() {
       const carltonHome = g.hteam === 'Carlton';
       const oppRaw = carltonHome ? g.ateam : g.hteam;
       const opp = SQUIGGLE_NAMES[oppRaw] || oppRaw;
-      const fx = FIXTURE_2026.find(f => f.opponent === opp && !taken[f.round]);
+      const fx = S_FIXTURE.find(f => f.opponent === opp && !taken[f.round]);
       if (!fx) return;
       taken[fx.round] = true;
       const forScore = carltonHome ? g.hscore : g.ascore;
@@ -2500,7 +4393,7 @@ function App() {
   };
   const syncResults = async () => {
     setSyncState('syncing');
-    const api = 'https://api.squiggle.com.au/?q=games;year=2026;team=3';
+    const api = `https://api.squiggle.com.au/?q=games;year=${S_YEAR};team=3`;
     const attempts = [api, 'https://api.allorigins.win/raw?url=' + encodeURIComponent(api)];
     for (const url of attempts) {
       try {
@@ -2515,7 +4408,7 @@ function App() {
             ...merged
           };
           try {
-            localStorage.setItem('carlton-results-2026', JSON.stringify(next));
+            localStorage.setItem(`carlton-results-${S_YEAR}`, JSON.stringify(next));
           } catch {}
           return next;
         });
@@ -2529,171 +4422,20 @@ function App() {
   };
 
   // --- Team sheet PNG export ---
-  const exportTeamSheet = () => {
-    const onField = Object.entries(fieldPlayers).filter(([_, pos]) => !pos.isInterchange).map(([id, pos]) => ({
-      player: CARLTON_PLAYERS.find(pl => pl.id === parseInt(id)),
-      pos
-    })).filter(e => e.player);
-    const benchPlayers = Object.entries(fieldPlayers).filter(([_, pos]) => pos.isInterchange).sort((a, b) => a[1].slot - b[1].slot).map(([id]) => CARLTON_PLAYERS.find(pl => pl.id === parseInt(id))).filter(Boolean);
-    if (onField.length === 0 && benchPlayers.length === 0) {
-      alert('Put some players on the board first — the team sheet is built from the board.');
-      return;
-    }
-    const sorted = onField.slice().sort((a, b) => a.pos.y - b.pos.y);
-    const byX = arr => arr.slice().sort((a, b) => a.pos.x - b.pos.x).map(e => e.player);
-    const lines = [{
-      label: 'BACKS',
-      players: byX(sorted.slice(0, 3))
-    }, {
-      label: 'HALF BACKS',
-      players: byX(sorted.slice(3, 6))
-    }, {
-      label: 'CENTRES',
-      players: byX(sorted.slice(6, 9))
-    }, {
-      label: 'HALF FORWARDS',
-      players: byX(sorted.slice(9, 12))
-    }, {
-      label: 'FORWARDS',
-      players: byX(sorted.slice(12, 15))
-    }, {
-      label: 'FOLLOWERS',
-      players: byX(sorted.slice(15, 18))
-    }].filter(l => l.players.length > 0);
-    const W = 1000,
-      H = 340 + lines.length * 130 + (benchPlayers.length ? 170 : 60);
-    const scale = 2;
-    const cv = document.createElement('canvas');
-    cv.width = W * scale;
-    cv.height = H * scale;
-    const ctx = cv.getContext('2d');
-    ctx.scale(scale, scale);
-    const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, '#0b1729');
-    bg.addColorStop(1, '#04080f');
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, W, H);
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(24, 24, W - 48, H - 48);
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '600 48px Oswald, Inter, sans-serif';
-    ctx.fillText('C A R L T O N', W / 2, 112);
-    ctx.font = '700 19px Inter, sans-serif';
-    ctx.fillStyle = '#60a5fa';
-    ctx.fillText('2 0 2 6   T E A M   S H E E T', W / 2, 148);
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-    ctx.beginPath();
-    ctx.moveTo(90, 180);
-    ctx.lineTo(W - 90, 180);
-    ctx.stroke();
-    const drawPlayer = (pl, cx, cy) => {
-      const num = String(pl.number);
-      const name = pl.name + (pl.captain ? ' (c)' : '');
-      ctx.font = '600 23px Oswald, Inter, sans-serif';
-      const numW = ctx.measureText(num).width;
-      ctx.font = '700 21px Inter, sans-serif';
-      const nameW = ctx.measureText(name).width;
-      const gap = 9;
-      let x = cx - (numW + gap + nameW) / 2;
-      ctx.textAlign = 'left';
-      ctx.font = '600 23px Oswald, Inter, sans-serif';
-      ctx.fillStyle = '#60a5fa';
-      ctx.fillText(num, x, cy);
-      ctx.font = '700 21px Inter, sans-serif';
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(name, x + numW + gap, cy);
-      ctx.textAlign = 'center';
-    };
-    let y = 245;
-    lines.forEach(line => {
-      ctx.font = '800 13px Inter, sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.fillText(line.label.split('').join(' '), W / 2, y);
-      const cols = line.players.length;
-      line.players.forEach((pl, i) => {
-        const cx = W * (i + 1) / (cols + 1);
-        drawPlayer(pl, cx, y + 42);
-      });
-      y += 130;
-    });
-    if (benchPlayers.length) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-      ctx.beginPath();
-      ctx.moveTo(90, y - 20);
-      ctx.lineTo(W - 90, y - 20);
-      ctx.stroke();
-      ctx.font = '800 13px Inter, sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.fillText('I N T E R C H A N G E', W / 2, y + 18);
-      benchPlayers.forEach((pl, i) => {
-        const cx = W * (i + 1) / (benchPlayers.length + 1);
-        drawPlayer(pl, cx, y + 62);
-      });
-      y += 110;
-    }
-    ctx.font = '600 12px Inter, sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    ctx.fillText(new Date().toLocaleDateString('en-AU', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    }), W / 2, H - 44);
-    cv.toBlob(blob => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `carlton-team-sheet-${new Date().toISOString().slice(0, 10)}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 'image/png');
-  };
+  const exportTeamSheet = () => saveTeamSheet(fieldPlayers, false);
 
   // --- Backup / restore ---
   const fileInputRef = useRef(null);
-  const exportBackup = () => {
-    const data = {
-      app: 'carlton-magnetboard',
-      version: 1,
-      exported: new Date().toISOString(),
-      votes,
-      ratings,
-      board: fieldPlayers
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: 'application/json'
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `carlton-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-  const importBackup = e => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(reader.result);
-        if (!data || !data.votes && !data.ratings && !data.board) throw new Error('empty');
-        if (data.votes) setVotes(data.votes);
-        if (data.ratings) setRatings(data.ratings);
-        if (data.board) setFieldPlayers(data.board);
-        alert('Backup restored.');
-      } catch {
-        alert('Could not read that file — expected a Carlton magnetboard backup (.json).');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
+  const exportBackup = () => downloadBackup({
+    votes,
+    ratings,
+    board: fieldPlayers
+  });
+  const importBackup = e => restoreBackupFile(e, d => {
+    if (d.votes) setVotes(d.votes);
+    if (d.ratings) setRatings(d.ratings);
+    if (d.board) setFieldPlayers(d.board);
+  });
   const handleSidebarDrag = (e, player) => {
     e.dataTransfer.setData('player', JSON.stringify(player));
   };
@@ -2789,13 +4531,7 @@ function App() {
           };
         });
       } else if (t.source !== 'sidebar') {
-        setFieldPlayers(prev => {
-          const n = {
-            ...prev
-          };
-          delete n[t.player.id];
-          return n;
-        });
+        removePlayer(t.player);
       }
     };
     window.addEventListener('pointermove', move);
@@ -2808,18 +4544,14 @@ function App() {
     };
   }, []);
   const handleMagnetDown = (e, player) => {
+    downAt.current = {
+      x: e.clientX,
+      y: e.clientY
+    };
     dragRef.current = true;
     setDragging(player);
   };
-  const handleMagnetDblClick = player => {
-    setFieldPlayers(prev => {
-      const next = {
-        ...prev
-      };
-      delete next[player.id];
-      return next;
-    });
-  };
+  const cardStatus = card ? !fieldPlayers[card.player.id] ? 'none' : fieldPlayers[card.player.id].isInterchange ? 'bench' : 'field' : null;
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -2829,11 +4561,11 @@ function App() {
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
+      minWidth: 0,
       display: 'flex',
       flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '16px',
+      gap: '10px',
+      padding: '60px 16px 16px',
       position: 'relative'
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -2861,12 +4593,25 @@ function App() {
     }
   }, "CARLTON"), /*#__PURE__*/React.createElement("span", {
     style: {
-      color: '#60a5fa',
-      fontWeight: '800',
-      fontSize: '16px',
-      letterSpacing: '2px'
+      display: 'inline-flex',
+      gap: '4px',
+      alignSelf: 'center'
     }
-  }, "2026"), /*#__PURE__*/React.createElement("span", {
+  }, Object.keys(SEASONS).map(y => /*#__PURE__*/React.createElement("button", {
+    key: y,
+    onClick: () => onSeason && onSeason(y),
+    style: {
+      padding: '3px 9px',
+      borderRadius: '7px',
+      cursor: 'pointer',
+      fontSize: '13px',
+      fontWeight: '800',
+      letterSpacing: '1px',
+      background: String(S_YEAR) === y ? 'linear-gradient(135deg, #ffffff 0%, #dce5f2 100%)' : 'rgba(255,255,255,0.05)',
+      color: String(S_YEAR) === y ? CARLTON_NAVY : 'rgba(255,255,255,0.5)',
+      border: String(S_YEAR) === y ? 'none' : '1px solid rgba(255,255,255,0.1)'
+    }
+  }, y))), /*#__PURE__*/React.createElement("span", {
     style: {
       color: 'rgba(255,255,255,0.35)',
       fontWeight: '600',
@@ -2879,7 +4624,7 @@ function App() {
       gap: '3px',
       alignItems: 'center'
     }
-  }, FIXTURE_2026.filter(g => results[g.round]).map(g => {
+  }, S_FIXTURE.filter(g => results[g.round]).map(g => {
     const r = results[g.round];
     return /*#__PURE__*/React.createElement("span", {
       key: g.round,
@@ -2902,9 +4647,10 @@ function App() {
       gap: '8px'
     }
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setFieldPlayers({}),
+    onClick: clearBoard,
+    title: "Take every player off the board (you can undo)",
     style: {
-      padding: '10px 16px',
+      padding: '10px 13px',
       background: 'rgba(239,68,68,0.1)',
       color: '#f87171',
       border: '1px solid rgba(239,68,68,0.25)',
@@ -2924,7 +4670,7 @@ function App() {
     onClick: exportBackup,
     title: "Download all votes, ratings and the board layout as a JSON file",
     style: {
-      padding: '10px 16px',
+      padding: '10px 13px',
       background: 'rgba(59,130,246,0.1)',
       color: '#60a5fa',
       border: '1px solid rgba(59,130,246,0.25)',
@@ -2944,7 +4690,7 @@ function App() {
     onClick: exportTeamSheet,
     title: "Export the current board as a classic team-sheet PNG (lines read top-to-bottom off the board)",
     style: {
-      padding: '10px 16px',
+      padding: '10px 13px',
       background: 'rgba(34,197,94,0.1)',
       color: '#4ade80',
       border: '1px solid rgba(34,197,94,0.25)',
@@ -2964,7 +4710,7 @@ function App() {
     onClick: () => fileInputRef.current && fileInputRef.current.click(),
     title: "Restore votes, ratings and board layout from a backup file",
     style: {
-      padding: '10px 16px',
+      padding: '10px 13px',
       background: 'rgba(255,255,255,0.05)',
       color: 'rgba(255,255,255,0.6)',
       border: '1px solid rgba(255,255,255,0.12)',
@@ -2980,7 +4726,37 @@ function App() {
     onMouseLeave: e => {
       e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
     }
-  }, "⭱ Restore"), /*#__PURE__*/React.createElement("input", {
+  }, "⭱ Restore"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSyncOpen(true),
+    title: sync.status ? sync.status.state === 'error' ? sync.status.msg : `Votes last synced ${ago(sync.status.last)}` : 'Sync B&F votes with your phone',
+    style: {
+      padding: '10px 14px',
+      background: 'rgba(255,255,255,0.05)',
+      color: syncColor(sync.status),
+      border: `1px solid ${sync.status && sync.status.state === 'error' ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.12)'}`,
+      borderRadius: '10px',
+      cursor: 'pointer',
+      fontSize: '12px',
+      fontWeight: '700'
+    }
+  }, "☁ ", syncLabel(sync.status)), window.CARLTON_PHONE && /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      try {
+        localStorage.setItem('carlton-view', 'mobile');
+      } catch {}
+      location.reload();
+    },
+    style: {
+      padding: '10px 16px',
+      background: 'rgba(255,255,255,0.9)',
+      color: CARLTON_NAVY,
+      border: 'none',
+      borderRadius: '10px',
+      cursor: 'pointer',
+      fontSize: '12px',
+      fontWeight: '800'
+    }
+  }, "Mobile view"), /*#__PURE__*/React.createElement("input", {
     ref: fileInputRef,
     type: "file",
     accept: ".json,application/json",
@@ -2988,7 +4764,14 @@ function App() {
     style: {
       display: 'none'
     }
-  })), /*#__PURE__*/React.createElement(LeftPanel, {
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minHeight: 0,
+      display: 'flex',
+      gap: '16px'
+    }
+  }, /*#__PURE__*/React.createElement(LeftPanel, {
     votes: votes,
     setVotes: setVotes,
     selectedRound: selectedRound,
@@ -3001,20 +4784,53 @@ function App() {
     onSyncResults: syncResults,
     syncState: syncState
   }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0,
+      containerType: 'size',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
     ref: fieldRef,
     onDragOver: e => e.preventDefault(),
     onDrop: handleDrop,
     style: {
-      height: 'min(calc(100vh - 110px), calc((100vw - 912px) * 1.1667))',
+      height: 'min(100cqh, calc((100cqw - 120px) * 1.1667))',
       aspectRatio: '480/560',
       position: 'relative',
       filter: 'drop-shadow(0 0 40px rgba(0,0,0,0.5))',
-      marginLeft: '260px',
       borderRadius: '50%'
     }
-  }, /*#__PURE__*/React.createElement(PositionLabels, null), /*#__PURE__*/React.createElement(Field, null), Object.entries(fieldPlayers).map(([id, pos]) => {
+  }, /*#__PURE__*/React.createElement(PositionLabels, null), /*#__PURE__*/React.createElement(Field, null), Object.keys(fieldPlayers).length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute',
+      left: '50%',
+      top: '50%',
+      transform: 'translate(-50%, -50%)',
+      pointerEvents: 'none',
+      textAlign: 'center',
+      whiteSpace: 'nowrap',
+      background: 'rgba(6,13,26,0.72)',
+      border: '1px solid rgba(255,255,255,0.12)',
+      borderRadius: '12px',
+      padding: '10px 16px',
+      backdropFilter: 'blur(4px)',
+      color: 'rgba(255,255,255,0.8)',
+      fontSize: '12px',
+      fontWeight: '600',
+      lineHeight: 1.6
+    }
+  }, "Drag players from the list onto the ground or bench", /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.45)',
+      fontSize: '11px',
+      fontWeight: '500'
+    }
+  }, "Click a player for their card • Double-click to remove")), Object.entries(fieldPlayers).map(([id, pos]) => {
     if (pos.isInterchange) return null;
-    const player = CARLTON_PLAYERS.find(p => p.id === parseInt(id));
+    const player = S_PLAYERS.find(p => p.id === parseInt(id));
     if (!player) return null;
     const dimmed = filter !== 'ALL' && player.position !== filter;
     return /*#__PURE__*/React.createElement(Magnet, {
@@ -3026,10 +4842,12 @@ function App() {
         e.dataTransfer.setData('source', 'field');
         dragRef.current = false;
         setDragging(null);
+        setCard(null);
       },
       onMouseDown: e => handleMagnetDown(e, player),
       onPointerDown: e => startTouchDrag(e, player, 'field'),
-      onDoubleClick: () => handleMagnetDblClick(player),
+      onClick: e => openCard(e, player, 250),
+      onDoubleClick: () => removeOnDblClick(player),
       style: {
         left: `${pos.x}%`,
         top: `${pos.y}%`,
@@ -3040,7 +4858,7 @@ function App() {
         transition: 'opacity 0.2s ease, filter 0.2s ease'
       }
     });
-  })), /*#__PURE__*/React.createElement("div", {
+  })))), /*#__PURE__*/React.createElement("div", {
     ref: benchRef,
     onDragOver: e => e.preventDefault(),
     onDrop: e => {
@@ -3061,32 +4879,46 @@ function App() {
       }
     },
     style: {
-      marginTop: '8px',
+      flexShrink: 0,
       background: `linear-gradient(145deg, ${CARLTON_NAVY_LIGHT} 0%, ${CARLTON_NAVY} 100%)`,
       border: '1px solid rgba(255,255,255,0.1)',
       borderRadius: '18px',
-      padding: '10px 20px',
+      padding: '10px 16px',
       display: 'flex',
       alignItems: 'center',
-      gap: '20px',
+      gap: '16px',
       boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      color: '#fff',
+      width: '58px',
+      flexShrink: 0,
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.6)',
       fontSize: '12px',
       fontWeight: '800',
-      letterSpacing: '2px',
-      opacity: 0.6
+      letterSpacing: '2px'
     }
   }, "BENCH"), /*#__PURE__*/React.createElement("div", {
     style: {
+      color: interchangeCount === 5 ? '#22c55e' : 'rgba(255,255,255,0.35)',
+      fontSize: '11px',
+      fontWeight: '700',
+      marginTop: '3px'
+    }
+  }, interchangeCount, "/5")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0,
       display: 'flex',
-      gap: '12px'
+      gap: '10px'
     }
   }, [0, 1, 2, 3, 4].map(slot => {
     const playerInSlot = Object.entries(fieldPlayers).find(([_, pos]) => pos.isInterchange && pos.slot === slot);
-    const player = playerInSlot ? CARLTON_PLAYERS.find(p => p.id === parseInt(playerInSlot[0])) : null;
+    const player = playerInSlot ? S_PLAYERS.find(p => p.id === parseInt(playerInSlot[0])) : null;
     if (player) {
       return /*#__PURE__*/React.createElement("div", {
         key: slot,
@@ -3096,13 +4928,19 @@ function App() {
           e.dataTransfer.setData('source', 'interchange');
         },
         onPointerDown: e => startTouchDrag(e, player, 'bench'),
-        onDoubleClick: () => handleMagnetDblClick(player),
+        onClick: e => openCard(e, player, 250),
+        onDoubleClick: () => removeOnDblClick(player),
+        title: `${player.name} • ${player.height}cm • ${calculateAge(player.dob)}y`,
         style: {
+          flex: '1 1 0',
+          minWidth: 0,
+          height: '58px',
           background: `linear-gradient(145deg, ${CARLTON_NAVY_LIGHT} 0%, ${CARLTON_NAVY} 100%)`,
           border: player.captain ? '2px solid #fbbf24' : '1px solid rgba(255,255,255,0.15)',
           borderRadius: '12px',
-          padding: '8px 12px',
-          minWidth: '145px',
+          padding: '0 12px',
+          display: 'flex',
+          alignItems: 'center',
           cursor: 'grab',
           touchAction: 'none',
           position: 'relative',
@@ -3129,7 +4967,9 @@ function App() {
         style: {
           display: 'flex',
           alignItems: 'center',
-          gap: '9px'
+          gap: '9px',
+          minWidth: 0,
+          width: '100%'
         }
       }, /*#__PURE__*/React.createElement(PlayerPhoto, {
         player: player,
@@ -3147,30 +4987,36 @@ function App() {
           textAlign: 'center',
           flexShrink: 0
         }
-      }, player.number), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      }, numLabel(player)), /*#__PURE__*/React.createElement("div", {
         style: {
-          display: 'flex',
-          alignItems: 'center',
-          gap: '5px'
+          minWidth: 0,
+          lineHeight: 1.2
         }
-      }, /*#__PURE__*/React.createElement("span", {
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          color: 'rgba(255,255,255,0.55)',
+          fontSize: '10.5px',
+          fontWeight: '600',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }
+      }, player.name.split(' ')[0]), /*#__PURE__*/React.createElement("div", {
         style: {
           color: '#fff',
           fontWeight: '700',
-          fontSize: '12px'
+          fontSize: '13px',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
         }
-      }, player.name)), /*#__PURE__*/React.createElement("div", {
-        style: {
-          color: 'rgba(255,255,255,0.5)',
-          fontSize: '10px',
-          marginTop: '2px'
-        }
-      }, player.height, "cm • ", calculateAge(player.dob), "y"))));
+      }, player.name.split(' ').slice(1).join(' ')))));
     }
     return /*#__PURE__*/React.createElement("div", {
       key: slot,
       style: {
-        width: '145px',
+        flex: '1 1 0',
+        minWidth: 0,
         height: '58px',
         border: '2px dashed rgba(255,255,255,0.12)',
         borderRadius: '12px',
@@ -3183,29 +5029,52 @@ function App() {
         background: 'rgba(255,255,255,0.02)'
       }
     }, slot + 1);
-  }))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: 'absolute',
-      bottom: '12px',
-      color: 'rgba(255,255,255,0.35)',
-      fontSize: '11px',
-      fontWeight: '500',
-      background: 'rgba(255,255,255,0.04)',
-      border: '1px solid rgba(255,255,255,0.07)',
-      borderRadius: '999px',
-      padding: '6px 16px',
-      backdropFilter: 'blur(8px)'
-    }
-  }, "Drag players onto the field • Double-click to remove")), /*#__PURE__*/React.createElement(Sidebar, {
+  })))), /*#__PURE__*/React.createElement(Sidebar, {
     players: bench,
+    selected: selectedPlayers,
     onDragStart: handleSidebarDrag,
     onPointerStart: startTouchDrag,
-    onRemovePlayer: handleMagnetDblClick,
+    onRemovePlayer: removePlayer,
+    onOpenCard: openCard,
     filter: filter,
     setFilter: setFilter,
+    query: query,
+    setQuery: setQuery,
     fieldCount: onFieldCount,
     interchangeCount: interchangeCount
-  }), touchDrag && /*#__PURE__*/React.createElement("div", {
+  }), card && /*#__PURE__*/React.createElement(PlayerCard, {
+    key: card.player.id,
+    player: card.player,
+    rect: card.rect,
+    votes: votes,
+    status: cardStatus,
+    benchFull: freeBenchSlot(fieldPlayers) === undefined,
+    onClose: closeCard,
+    onBench: () => moveToBench(card.player),
+    onRemove: () => {
+      setCard(null);
+      removePlayer(card.player);
+    }
+  }), syncOpen && /*#__PURE__*/React.createElement(Modal, {
+    title: "Sync votes",
+    onClose: closeSync
+  }, /*#__PURE__*/React.createElement(SyncPanel, {
+    sync: sync
+  })), toast && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'fixed',
+      left: '452px',
+      right: '316px',
+      bottom: '104px',
+      zIndex: 2500,
+      display: 'flex',
+      justifyContent: 'center',
+      pointerEvents: 'none'
+    }
+  }, /*#__PURE__*/React.createElement(ToastPill, {
+    toast: toast,
+    onUndo: runUndo
+  })), touchDrag && /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'fixed',
       left: touchDrag.x,
@@ -3227,6 +5096,1359 @@ function App() {
       whiteSpace: 'nowrap',
       boxShadow: '0 16px 40px rgba(0,0,0,0.6)'
     }
-  }, "#", touchDrag.player.number, " ", touchDrag.player.name)));
+  }, "#", numLabel(touchDrag.player), " ", touchDrag.player.name)));
 }
-ReactDOM.createRoot(document.getElementById('root')).render(/*#__PURE__*/React.createElement(App, null));
+
+// ============================ MOBILE ============================
+// Phones get their own layout (the head script in the HTML decides): a tap-to-pick team
+// sheet and one-round-at-a-time B&F voting. Same localStorage keys as the desktop board.
+
+const OSWALD = "'Oswald', 'Inter', sans-serif";
+const LINE_FILTER = {
+  B: 'DEF',
+  HB: 'DEF',
+  C: 'MID',
+  HF: 'FWD',
+  F: 'FWD',
+  FOL: 'MID'
+};
+const sameTarget = (a, b) => !!a && !!b && a.key === b.key && a.bench === b.bench;
+const POS_LONG = {
+  BP: 'Back pocket',
+  FB: 'Full back',
+  HBF: 'Half-back flank',
+  CHB: 'Centre half-back',
+  W: 'Wing',
+  C: 'Centre',
+  HFF: 'Half-forward flank',
+  CHF: 'Centre half-forward',
+  FP: 'Forward pocket',
+  FF: 'Full forward',
+  R: 'Ruck',
+  RR: 'Ruck-rover',
+  ROV: 'Rover'
+};
+const targetLabel = t => t.bench !== undefined ? `Interchange ${t.bench + 1}` : POS_LONG[TEAM_SLOTS.find(s => s.key === t.key).pos];
+
+// Average Wheelo rating by name: this season, or last season before the first game
+const ratingAverages = () => {
+  let year = S_YEAR,
+    stats = S_STATS;
+  if (!Object.keys(stats).length && SEASONS[S_YEAR - 1]) {
+    year = S_YEAR - 1;
+    stats = SEASONS[year].stats;
+  }
+  const acc = {};
+  Object.values(stats).forEach(rd => rd.players.forEach(p => {
+    const a = acc[p.name] || (acc[p.name] = {
+      sum: 0,
+      games: 0
+    });
+    a.sum += p.rating;
+    a.games++;
+  }));
+  const avg = {};
+  Object.entries(acc).forEach(([n, a]) => {
+    avg[n] = a.sum / a.games;
+  });
+  return {
+    year,
+    avg
+  };
+};
+const chipStyle = on => ({
+  padding: '8px 13px',
+  borderRadius: '999px',
+  flexShrink: 0,
+  background: on ? 'linear-gradient(135deg, #ffffff 0%, #dce5f2 100%)' : 'rgba(255,255,255,0.06)',
+  color: on ? CARLTON_NAVY : 'rgba(255,255,255,0.6)',
+  border: on ? '1px solid transparent' : '1px solid rgba(255,255,255,0.1)',
+  fontSize: '13px',
+  fontWeight: '700',
+  cursor: 'pointer'
+});
+
+// Bottom sheet: tap the backdrop or Done to close
+const Sheet = ({
+  title,
+  onClose,
+  children
+}) => /*#__PURE__*/React.createElement("div", {
+  onClick: onClose,
+  style: {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 4000,
+    background: 'rgba(2,6,14,0.6)',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'flex-end',
+    animation: 'fade-in 0.15s ease'
+  }
+}, /*#__PURE__*/React.createElement("div", {
+  onClick: e => e.stopPropagation(),
+  style: {
+    maxHeight: 'calc(100% - 44px)',
+    display: 'flex',
+    flexDirection: 'column',
+    background: `linear-gradient(180deg, ${CARLTON_NAVY_LIGHT} 0%, ${CARLTON_NAVY} 35%, ${CARLTON_NAVY_DARK} 100%)`,
+    borderRadius: '20px 20px 0 0',
+    border: '1px solid rgba(255,255,255,0.12)',
+    borderBottom: 'none',
+    boxShadow: '0 -20px 50px rgba(0,0,0,0.5)',
+    paddingBottom: 'env(safe-area-inset-bottom)',
+    animation: 'sheet-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)'
+  }
+}, /*#__PURE__*/React.createElement("div", {
+  style: {
+    display: 'flex',
+    justifyContent: 'center',
+    paddingTop: '8px'
+  }
+}, /*#__PURE__*/React.createElement("span", {
+  style: {
+    width: '40px',
+    height: '5px',
+    borderRadius: '3px',
+    background: 'rgba(255,255,255,0.22)'
+  }
+})), /*#__PURE__*/React.createElement("div", {
+  style: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '8px 16px 10px'
+  }
+}, /*#__PURE__*/React.createElement("span", {
+  style: {
+    color: '#fff',
+    fontSize: '17px',
+    fontWeight: '800'
+  }
+}, title), /*#__PURE__*/React.createElement("button", {
+  onClick: onClose,
+  style: {
+    padding: '7px 14px',
+    borderRadius: '999px',
+    border: 'none',
+    cursor: 'pointer',
+    background: 'rgba(255,255,255,0.1)',
+    color: '#fff',
+    fontSize: '14px',
+    fontWeight: '700'
+  }
+}, "Done")), /*#__PURE__*/React.createElement("div", {
+  style: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    overscrollBehavior: 'contain',
+    WebkitOverflowScrolling: 'touch',
+    padding: '0 16px 18px'
+  }
+}, children)));
+const SlotTile = ({
+  label,
+  player,
+  onTap,
+  highlight
+}) => /*#__PURE__*/React.createElement("button", {
+  onClick: onTap,
+  style: {
+    position: 'relative',
+    minWidth: 0,
+    height: '88px',
+    padding: '16px 6px 8px',
+    borderRadius: '13px',
+    background: player ? `linear-gradient(145deg, ${CARLTON_NAVY_LIGHT} 0%, ${CARLTON_NAVY} 100%)` : 'rgba(255,255,255,0.025)',
+    border: highlight ? '2px solid #60a5fa' : player ? player.captain ? '1.5px solid #fbbf24' : '1px solid rgba(255,255,255,0.14)' : '1.5px dashed rgba(255,255,255,0.14)',
+    boxShadow: highlight ? '0 0 0 4px rgba(96,165,250,0.18)' : player ? '0 4px 12px rgba(0,0,0,0.3)' : 'none',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '5px',
+    color: '#fff',
+    cursor: 'pointer',
+    textAlign: 'center'
+  }
+}, /*#__PURE__*/React.createElement("span", {
+  style: {
+    position: 'absolute',
+    top: '6px',
+    left: '8px',
+    fontSize: '9.5px',
+    fontWeight: '800',
+    letterSpacing: '0.5px',
+    color: 'rgba(255,255,255,0.38)'
+  }
+}, label), player && player.captain && /*#__PURE__*/React.createElement("span", {
+  style: {
+    position: 'absolute',
+    top: '-6px',
+    right: '-6px',
+    width: '19px',
+    height: '19px',
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+    color: '#000',
+    fontSize: '10px',
+    fontWeight: '900',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  }
+}, "C"), player ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+  style: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px'
+  }
+}, /*#__PURE__*/React.createElement(PlayerPhoto, {
+  player: player,
+  size: 30
+}), /*#__PURE__*/React.createElement("span", {
+  style: {
+    fontFamily: OSWALD,
+    fontSize: '21px',
+    fontWeight: '600',
+    lineHeight: 1
+  }
+}, numLabel(player))), /*#__PURE__*/React.createElement("span", {
+  style: {
+    fontSize: '12.5px',
+    fontWeight: '700',
+    maxWidth: '100%',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap'
+  }
+}, surname(player))) : /*#__PURE__*/React.createElement("span", {
+  style: {
+    fontSize: '24px',
+    fontWeight: '300',
+    color: 'rgba(255,255,255,0.28)',
+    lineHeight: 1
+  }
+}, "+"));
+
+// Pick a player for one slot. Opens filtered to the slot's line; only unpicked players.
+const PickerSheet = ({
+  target,
+  board,
+  onPick,
+  onClose
+}) => {
+  const line = target.bench !== undefined ? null : TEAM_LINES.find(l => l.slots.some(s => s.key === target.key));
+  const [pos, setPos] = useState(target.key === 'R' ? 'RUCK' : line ? LINE_FILTER[line.key] : 'ALL');
+  const [query, setQuery] = useState('');
+  const [byRating, setByRating] = useState(false);
+  const ra = useMemo(ratingAverages, []);
+  const q = query.trim();
+  const avail = S_PLAYERS.filter(p => !board[p.id]).filter(p => pos === 'ALL' || p.position === pos).filter(p => !q || (/^\d+$/.test(q) ? String(p.number) === q : normName(p.name).includes(normName(q)))).sort((a, b) => byRating ? (ra.avg[b.name] ?? -99) - (ra.avg[a.name] ?? -99) : a.number - b.number);
+  return /*#__PURE__*/React.createElement(Sheet, {
+    title: targetLabel(target),
+    onClose: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '8px',
+      marginBottom: '10px'
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    value: query,
+    onChange: e => setQuery(e.target.value),
+    placeholder: "Name or number",
+    spellCheck: false,
+    style: {
+      flex: 1,
+      minWidth: 0,
+      padding: '11px 14px',
+      background: 'rgba(255,255,255,0.06)',
+      border: '1px solid rgba(255,255,255,0.12)',
+      borderRadius: '10px',
+      color: '#fff',
+      fontSize: '16px',
+      fontFamily: 'Inter, sans-serif',
+      outline: 'none'
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setByRating(!byRating),
+    title: "Sort order",
+    style: {
+      ...chipStyle(byRating),
+      borderRadius: '10px',
+      padding: '0 12px'
+    }
+  }, byRating ? 'Rating ↓' : 'No. ↑')), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '6px',
+      paddingBottom: '10px'
+    }
+  }, ['ALL', 'DEF', 'MID', 'RUCK', 'FWD'].map(k => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    onClick: () => setPos(k),
+    style: {
+      ...chipStyle(pos === k),
+      flex: 1,
+      padding: '8px 0'
+    }
+  }, k === 'ALL' ? 'All' : k))), avail.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.45)',
+      fontSize: '14px',
+      textAlign: 'center',
+      padding: '28px 10px'
+    }
+  }, q ? `Nobody left matching “${q}”` : `No ${pos === 'ALL' ? '' : pos + ' '}players left to pick`, pos !== 'ALL' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPos('ALL'),
+    style: {
+      ...chipStyle(true),
+      marginTop: '12px'
+    }
+  }, "Show everyone"))), avail.map(p => /*#__PURE__*/React.createElement("button", {
+    key: p.id,
+    onClick: () => onPick(p.id),
+    style: {
+      width: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '11px',
+      padding: '10px 4px',
+      background: 'transparent',
+      border: 'none',
+      borderBottom: '1px solid rgba(255,255,255,0.06)',
+      color: '#fff',
+      cursor: 'pointer',
+      textAlign: 'left'
+    }
+  }, /*#__PURE__*/React.createElement(PlayerPhoto, {
+    player: p,
+    size: 42
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: OSWALD,
+      fontSize: '22px',
+      fontWeight: '600',
+      minWidth: '28px',
+      textAlign: 'center'
+    }
+  }, numLabel(p)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'block',
+      fontSize: '15px',
+      fontWeight: '700',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis'
+    }
+  }, p.name, p.captain ? ' ©' : ''), /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'block',
+      fontSize: '12px',
+      color: 'rgba(255,255,255,0.45)',
+      marginTop: '2px'
+    }
+  }, p.position, " • ", p.height, "cm • ", calculateAge(p.dob), "y")), ra.avg[p.name] !== undefined && /*#__PURE__*/React.createElement("span", {
+    style: {
+      textAlign: 'right'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'block',
+      color: '#60a5fa',
+      fontSize: '14px',
+      fontWeight: '800'
+    }
+  }, ra.avg[p.name].toFixed(1)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'block',
+      color: 'rgba(255,255,255,0.3)',
+      fontSize: '9px',
+      fontWeight: '700'
+    }
+  }, ra.year === S_YEAR ? 'AVG' : `${ra.year} AVG`)))));
+};
+const MobileTeam = ({
+  board,
+  setBoard,
+  votes,
+  showToast
+}) => {
+  const a = slotsFromBoard(board);
+  const [picker, setPicker] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [moving, setMoving] = useState(null);
+  const getT = (as, t) => t.bench !== undefined ? as.bench[t.bench] : as.slots[t.key];
+  const setT = (as, t, id) => {
+    if (t.bench !== undefined) as.bench[t.bench] = id || null;else if (id) as.slots[t.key] = id;else delete as.slots[t.key];
+  };
+  const draft = () => ({
+    slots: {
+      ...a.slots
+    },
+    bench: [...a.bench],
+    extra: [...a.extra]
+  });
+  const commit = next => setBoard(prev => boardFromSlots(next, prev));
+  const place = (t, id) => {
+    const n = draft();
+    setT(n, t, id);
+    commit(n);
+  };
+  const swap = (from, to) => {
+    const n = draft();
+    const x = getT(n, from),
+      y = getT(n, to);
+    setT(n, to, x);
+    setT(n, from, y);
+    commit(n);
+  };
+  const remove = t => {
+    const pl = playerById(getT(a, t));
+    const before = board;
+    const n = draft();
+    setT(n, t, null);
+    commit(n);
+    showToast(`${pl ? pl.name : 'Player'} removed`, () => setBoard(before));
+  };
+  const removeExtra = id => {
+    const before = board;
+    setBoard(prev => {
+      const n = {
+        ...prev
+      };
+      delete n[id];
+      return n;
+    });
+    showToast(`${playerById(id).name} removed`, () => setBoard(before));
+  };
+  const clearAll = () => {
+    const before = board;
+    const n = Object.keys(before).length;
+    if (!n) return;
+    setBoard({});
+    showToast(`Team cleared (${n} player${n === 1 ? '' : 's'})`, () => setBoard(before));
+  };
+  const tap = t => {
+    if (moving) {
+      if (!sameTarget(moving.target, t)) swap(moving.target, t);
+      setMoving(null);
+      return;
+    }
+    const id = getT(a, t);
+    if (id) setDetail({
+      target: t,
+      id
+    });else setPicker(t);
+  };
+  const fieldCount = TEAM_SLOTS.filter(s => a.slots[s.key]).length + a.extra.length;
+  const benchCount = a.bench.filter(Boolean).length;
+  const selected = S_PLAYERS.filter(p => board[p.id]);
+  const {
+    comp,
+    warnings
+  } = teamBalance(selected, fieldCount);
+  const complete = fieldCount === 18 && benchCount === 5;
+  const detailPlayer = detail && playerById(detail.id);
+  const tile = (t, label) => {
+    const pl = playerById(getT(a, t));
+    return /*#__PURE__*/React.createElement(SlotTile, {
+      key: t.key || 'b' + t.bench,
+      label: label,
+      player: pl,
+      onTap: () => tap(t),
+      highlight: moving && sameTarget(moving.target, t)
+    });
+  };
+  const rowLabel = txt => /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'rgba(255,255,255,0.45)',
+      fontSize: '11px',
+      fontWeight: '800',
+      letterSpacing: '1px',
+      textAlign: 'center'
+    }
+  }, txt);
+  const grid = {
+    display: 'grid',
+    gridTemplateColumns: '34px repeat(3, minmax(0, 1fr))',
+    gap: '7px',
+    alignItems: 'center'
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '12px 14px 24px'
+    }
+  }, /*#__PURE__*/React.createElement(GlassCard, {
+    style: {
+      padding: '12px 14px',
+      marginBottom: '14px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '14px'
+    }
+  }, [['ON FIELD', fieldCount, 18], ['BENCH', benchCount, 5]].map(([l, v, max]) => /*#__PURE__*/React.createElement("div", {
+    key: l
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: OSWALD,
+      fontSize: '22px',
+      fontWeight: '600',
+      lineHeight: 1.1,
+      color: v === max ? '#22c55e' : '#fff'
+    }
+  }, v, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'rgba(255,255,255,0.3)',
+      fontSize: '15px'
+    }
+  }, "/", max)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: '9px',
+      fontWeight: '700',
+      letterSpacing: '1px'
+    }
+  }, l))), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => saveTeamSheet(board, true),
+    style: {
+      ...chipStyle(complete),
+      padding: '9px 14px'
+    }
+  }, "Share"), /*#__PURE__*/React.createElement("button", {
+    onClick: clearAll,
+    disabled: !selected.length,
+    style: {
+      ...chipStyle(false),
+      padding: '9px 12px',
+      color: '#f87171',
+      border: '1px solid rgba(239,68,68,0.3)',
+      opacity: selected.length ? 1 : 0.35
+    }
+  }, "Clear")), comp && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      marginTop: '10px',
+      paddingTop: '10px',
+      borderTop: '1px solid rgba(255,255,255,0.06)'
+    }
+  }, [['AVG AGE', comp.age.toFixed(1)], ['AVG HT', Math.round(comp.height)], ['TALLS', comp.talls], ['RUCKS', comp.rucks]].map(([l, v]) => /*#__PURE__*/React.createElement("div", {
+    key: l,
+    style: {
+      flex: 1,
+      textAlign: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.85)',
+      fontSize: '14px',
+      fontWeight: '700'
+    }
+  }, v), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.35)',
+      fontSize: '8.5px',
+      fontWeight: '700',
+      letterSpacing: '0.8px',
+      marginTop: '1px'
+    }
+  }, l)))), warnings.map(w => /*#__PURE__*/React.createElement("div", {
+    key: w,
+    style: {
+      marginTop: '8px',
+      padding: '7px 10px',
+      borderRadius: '8px',
+      background: 'rgba(251,191,36,0.1)',
+      border: '1px solid rgba(251,191,36,0.25)',
+      color: '#fbbf24',
+      fontSize: '12px',
+      fontWeight: '700'
+    }
+  }, w))), moving && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'sticky',
+      top: 0,
+      zIndex: 5,
+      marginBottom: '12px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      padding: '10px 12px',
+      background: 'rgba(29,78,216,0.95)',
+      borderRadius: '12px',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+      color: '#fff',
+      fontSize: '13.5px',
+      fontWeight: '600'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, "Tap where ", surname(playerById(moving.id)), " should go"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMoving(null),
+    style: {
+      ...chipStyle(true),
+      padding: '7px 12px'
+    }
+  }, "Cancel")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px'
+    }
+  }, TEAM_LINES.map(line => /*#__PURE__*/React.createElement("div", {
+    key: line.key,
+    style: grid
+  }, rowLabel(line.short), line.slots.map(s => tile({
+    key: s.key
+  }, s.pos))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.45)',
+      fontSize: '11px',
+      fontWeight: '800',
+      letterSpacing: '1.5px',
+      margin: '18px 0 8px'
+    }
+  }, "INTERCHANGE"), /*#__PURE__*/React.createElement("div", {
+    style: grid
+  }, rowLabel('I/C'), [0, 1, 2].map(i => tile({
+    bench: i
+  }, `IC${i + 1}`)), /*#__PURE__*/React.createElement("span", null), [3, 4].map(i => tile({
+    bench: i
+  }, `IC${i + 1}`))), a.extra.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: '16px',
+      color: 'rgba(255,255,255,0.55)',
+      fontSize: '12.5px'
+    }
+  }, "Also on the field from the desktop board:", a.extra.map(id => /*#__PURE__*/React.createElement("button", {
+    key: id,
+    onClick: () => removeExtra(id),
+    style: {
+      ...chipStyle(false),
+      margin: '6px 6px 0 0'
+    }
+  }, playerById(id).name, " ✕"))), picker && /*#__PURE__*/React.createElement(PickerSheet, {
+    target: picker,
+    board: board,
+    onClose: () => setPicker(null),
+    onPick: id => {
+      place(picker, id);
+      setPicker(null);
+    }
+  }), detailPlayer && /*#__PURE__*/React.createElement(Sheet, {
+    title: targetLabel(detail.target),
+    onClose: () => setDetail(null)
+  }, /*#__PURE__*/React.createElement(PlayerSummary, {
+    player: detailPlayer,
+    votes: votes
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(3, 1fr)',
+      gap: '8px',
+      marginTop: '18px'
+    }
+  }, [['Move', () => {
+    setMoving({
+      target: detail.target,
+      id: detail.id
+    });
+    setDetail(null);
+  }, false], ['Change', () => {
+    setPicker(detail.target);
+    setDetail(null);
+  }, false], ['Remove', () => {
+    remove(detail.target);
+    setDetail(null);
+  }, true]].map(([label, fn, red]) => /*#__PURE__*/React.createElement("button", {
+    key: label,
+    onClick: fn,
+    style: {
+      padding: '13px 6px',
+      borderRadius: '11px',
+      cursor: 'pointer',
+      background: red ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.08)',
+      border: `1px solid ${red ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.14)'}`,
+      color: red ? '#f87171' : '#fff',
+      fontSize: '14px',
+      fontWeight: '700'
+    }
+  }, label)))));
+};
+const MobileVotes = ({
+  votes,
+  setVotes,
+  ratings
+}) => {
+  const playable = S_FIXTURE.filter(g => g.opponent !== 'BYE');
+  const playedIn = r => Object.entries(ratings[r] || {}).filter(([, d]) => d && d.rating !== null && d.rating !== undefined).map(([id, d]) => ({
+    player: playerById(+id),
+    rating: d.rating,
+    tog: d.tog
+  })).filter(x => x.player).sort((x, y) => y.rating - x.rating);
+  const scoredIn = r => S_PLAYERS.filter(p => votes[p.id]?.[r] !== undefined && votes[p.id]?.[r] !== null).length;
+
+  // Opens on the latest round with ratings: the one you most likely want to vote on
+  const [round, setRound] = useState(() => {
+    const rated = playable.filter(g => playedIn(g.round).length > 0);
+    return (rated[rated.length - 1] || playable[0] || {}).round;
+  });
+  const [view, setView] = useState('vote');
+  const [showAll, setShowAll] = useState(false);
+  const rowRefs = useRef({});
+  if (!playable.length) return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '14px'
+    }
+  }, /*#__PURE__*/React.createElement(EmptySeasonCard, {
+    what: "BEST & FAIREST"
+  }));
+  const idx = playable.findIndex(g => g.round === round);
+  const game = playable[idx];
+  const res = S_RESULTS[round];
+  const played = playedIn(round);
+  const playedIds = new Set(played.map(x => x.player.id));
+  const others = S_PLAYERS.filter(p => !playedIds.has(p.id)).sort((a, b) => a.number - b.number).map(p => ({
+    player: p
+  }));
+  const list = played.length ? showAll ? [...played, ...others] : played : others;
+  const scored = scoredIn(round);
+  const target = played.length || null;
+  const setScore = (pid, s) => {
+    const off = votes[pid]?.[round] === s;
+    setVotes(prev => ({
+      ...prev,
+      [pid]: {
+        ...prev[pid],
+        [round]: off ? undefined : s
+      }
+    }));
+    if (navigator.vibrate) navigator.vibrate(8);
+    if (off) return;
+    const at = list.findIndex(x => x.player.id === pid);
+    const next = list.slice(at + 1).find(x => votes[x.player.id]?.[round] === undefined || votes[x.player.id]?.[round] === null);
+    if (next) setTimeout(() => {
+      const el = rowRefs.current[next.player.id];
+      if (el && el.scrollIntoView) el.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }, 120);
+  };
+  const roundStatus = r => {
+    const n = playedIn(r).length,
+      s = scoredIn(r);
+    return !n ? '' : s >= n ? '  ✓' : s ? `  (${n - s} left)` : '';
+  };
+  const arrow = d => {
+    const off = idx + d < 0 || idx + d >= playable.length;
+    return /*#__PURE__*/React.createElement("button", {
+      onClick: () => !off && setRound(playable[idx + d].round),
+      disabled: off,
+      style: {
+        width: '44px',
+        flexShrink: 0,
+        borderRadius: '11px',
+        fontSize: '20px',
+        fontWeight: '700',
+        background: 'rgba(255,255,255,0.06)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        color: '#fff',
+        opacity: off ? 0.25 : 1,
+        cursor: 'pointer'
+      }
+    }, d < 0 ? '‹' : '›');
+  };
+
+  // Leaderboard (same tie-aware ranking as the desktop)
+  const totals = S_PLAYERS.map(p => {
+    const vs = Object.values(votes[p.id] || {}).filter(v => v !== undefined && v !== null);
+    return {
+      player: p,
+      total: vs.reduce((s, v) => s + v, 0),
+      games: vs.length
+    };
+  }).filter(x => x.games > 0).sort((a, b) => b.total - a.total);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: '12px 14px 24px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '6px',
+      marginBottom: '4px'
+    }
+  }, [['vote', 'Vote'], ['board', 'Leaderboard']].map(([k, l]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    onClick: () => setView(k),
+    style: {
+      ...chipStyle(view === k),
+      flex: 1,
+      padding: '10px'
+    }
+  }, l))), view === 'board' ? totals.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.4)',
+      fontSize: '14px',
+      textAlign: 'center',
+      padding: '40px 10px'
+    }
+  }, "No votes yet") : totals.map((x, i) => {
+    const rank = totals.findIndex(y => y.total === x.total) + 1;
+    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: x.player.id,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        padding: '10px 0',
+        borderBottom: '1px solid rgba(255,255,255,0.05)'
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: '26px',
+        textAlign: 'center',
+        color: rank <= 3 ? '#fbbf24' : 'rgba(255,255,255,0.4)',
+        fontSize: medal ? '17px' : '14px',
+        fontWeight: '800'
+      }
+    }, medal || rank), /*#__PURE__*/React.createElement(PlayerPhoto, {
+      player: x.player,
+      size: 38
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: 'block',
+        color: '#fff',
+        fontSize: '15px',
+        fontWeight: '700',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis'
+      }
+    }, x.player.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        display: 'block',
+        color: 'rgba(255,255,255,0.4)',
+        fontSize: '12px'
+      }
+    }, x.games, " gm • ", (x.total / x.games).toFixed(2), " avg")), /*#__PURE__*/React.createElement("span", {
+      style: {
+        background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)',
+        color: '#fff',
+        padding: '6px 13px',
+        borderRadius: '10px',
+        fontSize: '17px',
+        fontWeight: '800'
+      }
+    }, x.total));
+  }) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'sticky',
+      top: 0,
+      zIndex: 3,
+      margin: '0 -14px',
+      padding: '8px 14px 6px',
+      background: '#08111f',
+      borderBottom: '1px solid rgba(255,255,255,0.06)'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '6px',
+      marginBottom: '8px'
+    }
+  }, arrow(-1), /*#__PURE__*/React.createElement("select", {
+    value: round,
+    onChange: e => setRound(e.target.value),
+    style: {
+      flex: 1,
+      minWidth: 0,
+      padding: '12px',
+      borderRadius: '11px',
+      background: CARLTON_NAVY,
+      color: '#fff',
+      border: '1px solid rgba(255,255,255,0.15)',
+      fontSize: '16px',
+      fontWeight: '700',
+      fontFamily: 'Inter, sans-serif'
+    }
+  }, playable.map(g => /*#__PURE__*/React.createElement("option", {
+    key: g.round,
+    value: g.round
+  }, g.round, " ", g.home ? 'vs' : '@', " ", g.opponent, roundStatus(g.round)))), arrow(1)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      marginBottom: '6px',
+      fontSize: '12.5px'
+    }
+  }, res && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: '800',
+      color: res.result === 'W' ? '#22c55e' : res.result === 'D' ? '#fbbf24' : '#f87171'
+    }
+  }, res.result, " ", res.for, "–", res.against), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'rgba(255,255,255,0.45)',
+      flex: 1,
+      minWidth: 0,
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis'
+    }
+  }, game && game.venue), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: '700',
+      color: target && scored >= target ? '#22c55e' : 'rgba(255,255,255,0.7)'
+    }
+  }, scored, target ? `/${target}` : '', " voted")), target && /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: '4px',
+      borderRadius: '2px',
+      background: 'rgba(255,255,255,0.07)',
+      marginBottom: '10px',
+      overflow: 'hidden'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      height: '100%',
+      width: `${Math.min(100, scored / target * 100)}%`,
+      background: scored >= target ? '#22c55e' : '#60a5fa',
+      transition: 'width 0.25s ease'
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      color: 'rgba(255,255,255,0.35)',
+      fontSize: '10.5px',
+      fontWeight: '600',
+      marginBottom: '4px'
+    }
+  }, ['0 Bad', '1 OK', '2 Good', '3 V.Good', '4 Great'].map(l => /*#__PURE__*/React.createElement("span", {
+    key: l
+  }, l)))), !played.length && /*#__PURE__*/React.createElement("div", {
+    style: {
+      color: 'rgba(255,255,255,0.45)',
+      fontSize: '12.5px',
+      padding: '8px 0'
+    }
+  }, "No Wheelo ratings for ", round, " yet, so everyone's listed."), list.map(({
+    player: p,
+    rating,
+    tog
+  }) => {
+    const score = votes[p.id]?.[round];
+    return /*#__PURE__*/React.createElement("div", {
+      key: p.id,
+      ref: el => {
+        rowRefs.current[p.id] = el;
+      },
+      style: {
+        padding: '12px 0',
+        borderBottom: '1px solid rgba(255,255,255,0.05)'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        marginBottom: '9px'
+      }
+    }, /*#__PURE__*/React.createElement(PlayerPhoto, {
+      player: p,
+      size: 36
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontFamily: OSWALD,
+        fontSize: '20px',
+        fontWeight: '600',
+        minWidth: '26px',
+        textAlign: 'center',
+        color: '#fff'
+      }
+    }, numLabel(p)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0,
+        color: '#fff',
+        fontSize: '15px',
+        fontWeight: '700',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis'
+      }
+    }, p.name), rating !== undefined && /*#__PURE__*/React.createElement("span", {
+      style: {
+        background: rating >= 15 ? 'rgba(34,197,94,0.22)' : rating >= 8 ? 'rgba(251,191,36,0.22)' : 'rgba(255,255,255,0.08)',
+        color: rating >= 15 ? '#22c55e' : rating >= 8 ? '#fbbf24' : 'rgba(255,255,255,0.55)',
+        fontSize: '12px',
+        fontWeight: '800',
+        padding: '3px 7px',
+        borderRadius: '6px'
+      }
+    }, rating.toFixed(1)), tog ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: 'rgba(255,255,255,0.35)',
+        fontSize: '11px',
+        minWidth: '30px',
+        textAlign: 'right'
+      }
+    }, Math.round(tog), "%") : null), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(5, 1fr)',
+        gap: '6px'
+      }
+    }, [0, 1, 2, 3, 4].map(s => /*#__PURE__*/React.createElement("button", {
+      key: s,
+      onClick: () => setScore(p.id, s),
+      style: {
+        height: '44px',
+        borderRadius: '10px',
+        cursor: 'pointer',
+        background: score === s ? scoreColors[s].bg : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${score === s ? scoreColors[s].border : 'rgba(255,255,255,0.08)'}`,
+        color: score === s ? scoreColors[s].text : 'rgba(255,255,255,0.4)',
+        fontSize: '17px',
+        fontWeight: '800'
+      }
+    }, s))));
+  }), played.length > 0 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowAll(!showAll),
+    style: {
+      ...chipStyle(false),
+      width: '100%',
+      marginTop: '14px',
+      padding: '12px'
+    }
+  }, showAll ? 'Hide players who didn’t play' : `Show the other ${others.length} players`)));
+};
+function MobileApp({
+  onSeason
+}) {
+  const [tab, setTab] = useState(() => {
+    try {
+      return localStorage.getItem('carlton-mobile-tab') || 'team';
+    } catch {
+      return 'team';
+    }
+  });
+  const [board, setBoard] = useState(() => loadJSON(`carlton-board-${S_YEAR}`));
+  const [votes, setVotes] = useState(() => loadJSON(`carlton-bf-${S_YEAR}`));
+  const [ratings, setRatings] = useState(loadRatings);
+  const [menu, setMenu] = useState(false);
+  const fileRef = useRef(null);
+  const {
+    toast,
+    showToast,
+    runUndo
+  } = useUndoToast();
+  const sync = useVoteSync(votes, setVotes);
+  const [syncOpen, setSyncOpen] = useState(false);
+  useEffect(() => {
+    try {
+      localStorage.setItem('carlton-mobile-tab', tab);
+    } catch {}
+  }, [tab]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(`carlton-board-${S_YEAR}`, JSON.stringify(board));
+    } catch {}
+  }, [board]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(`carlton-bf-${S_YEAR}`, JSON.stringify(votes));
+    } catch {}
+  }, [votes]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(`carlton-wheelo-${S_YEAR}`, JSON.stringify(ratings));
+    } catch {}
+  }, [ratings]);
+  const copyText = async () => {
+    const text = teamText(board);
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('Team copied');
+      return;
+    } catch {}
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          text
+        });
+        return;
+      } catch {}
+    }
+    window.prompt('Copy your team:', text);
+  };
+  const menuItem = (label, sub, fn) => /*#__PURE__*/React.createElement("button", {
+    key: label,
+    onClick: () => {
+      setMenu(false);
+      fn();
+    },
+    style: {
+      width: '100%',
+      textAlign: 'left',
+      padding: '14px 4px',
+      background: 'transparent',
+      border: 'none',
+      borderBottom: '1px solid rgba(255,255,255,0.06)',
+      color: '#fff',
+      cursor: 'pointer'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'block',
+      fontSize: '16px',
+      fontWeight: '700'
+    }
+  }, label), /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'block',
+      fontSize: '12.5px',
+      color: 'rgba(255,255,255,0.45)',
+      marginTop: '2px'
+    }
+  }, sub));
+  const tabs = [['team', 'Best 23', 'M7 3 3 6l2 4 2-1v11h10V9l2 1 2-4-4-3c-.6 1.5-2.6 2.6-5 2.6S7.6 4.5 7 3z'], ['bf', 'B&F votes', 'M8 2h8l-2.5 6.5h-3zM12 22a6 6 0 1 0 0-12 6 6 0 0 0 0 12z']];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'fixed',
+      inset: 0,
+      display: 'flex',
+      flexDirection: 'column'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flexShrink: 0,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      padding: 'calc(env(safe-area-inset-top) + 10px) 14px 10px',
+      background: 'rgba(6,13,26,0.88)',
+      borderBottom: '1px solid rgba(255,255,255,0.07)'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#fff',
+      fontWeight: '900',
+      fontSize: '16px',
+      letterSpacing: '3px'
+    }
+  }, "CARLTON"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-flex',
+      gap: '4px'
+    }
+  }, Object.keys(SEASONS).map(y => /*#__PURE__*/React.createElement("button", {
+    key: y,
+    onClick: () => onSeason && onSeason(y),
+    style: {
+      ...chipStyle(String(S_YEAR) === y),
+      padding: '6px 11px'
+    }
+  }, y))), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setSyncOpen(true),
+    "aria-label": syncLabel(sync.status),
+    style: {
+      position: 'relative',
+      width: '40px',
+      height: '40px',
+      borderRadius: '12px',
+      cursor: 'pointer',
+      background: 'rgba(255,255,255,0.06)',
+      border: '1px solid rgba(255,255,255,0.1)',
+      color: '#fff',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "1.8",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: "M7 18h10.5a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.34 9.1 4.5 4.5 0 0 0 7 18z"
+  })), sync.status && /*#__PURE__*/React.createElement("span", {
+    style: {
+      position: 'absolute',
+      right: '6px',
+      bottom: '6px',
+      width: '9px',
+      height: '9px',
+      borderRadius: '50%',
+      background: syncColor(sync.status),
+      border: '2px solid #0b1424'
+    }
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setMenu(true),
+    "aria-label": "More",
+    style: {
+      width: '40px',
+      height: '40px',
+      borderRadius: '12px',
+      cursor: 'pointer',
+      background: 'rgba(255,255,255,0.06)',
+      border: '1px solid rgba(255,255,255,0.1)',
+      color: '#fff',
+      fontSize: '20px',
+      fontWeight: '800',
+      lineHeight: 1
+    }
+  }, "⋯")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1,
+      minHeight: 0,
+      overflowY: 'auto',
+      overscrollBehavior: 'contain',
+      WebkitOverflowScrolling: 'touch'
+    }
+  }, tab === 'team' ? /*#__PURE__*/React.createElement(MobileTeam, {
+    board: board,
+    setBoard: setBoard,
+    votes: votes,
+    showToast: showToast
+  }) : /*#__PURE__*/React.createElement(MobileVotes, {
+    votes: votes,
+    setVotes: setVotes,
+    ratings: ratings
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flexShrink: 0,
+      display: 'flex',
+      background: 'rgba(6,13,26,0.94)',
+      borderTop: '1px solid rgba(255,255,255,0.08)',
+      paddingBottom: 'env(safe-area-inset-bottom)'
+    }
+  }, tabs.map(([k, label, d]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    onClick: () => setTab(k),
+    style: {
+      flex: 1,
+      padding: '9px 0 8px',
+      background: 'transparent',
+      border: 'none',
+      cursor: 'pointer',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: '3px',
+      color: tab === k ? '#fff' : 'rgba(255,255,255,0.4)',
+      fontSize: '11px',
+      fontWeight: '700',
+      borderTop: `2px solid ${tab === k ? '#fff' : 'transparent'}`
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    width: "22",
+    height: "22",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "1.8",
+    strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("path", {
+    d: d
+  })), label))), toast && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'fixed',
+      left: '12px',
+      right: '12px',
+      bottom: 'calc(env(safe-area-inset-bottom) + 74px)',
+      zIndex: 3500,
+      display: 'flex',
+      justifyContent: 'center',
+      pointerEvents: 'none'
+    }
+  }, /*#__PURE__*/React.createElement(ToastPill, {
+    toast: toast,
+    onUndo: runUndo
+  })), menu && /*#__PURE__*/React.createElement(Sheet, {
+    title: "More",
+    onClose: () => setMenu(false)
+  }, menuItem('Sync votes', sync.status ? `${syncLabel(sync.status)} • last ${ago(sync.status.last)}` : 'Keep votes the same on your phone and computer', () => setSyncOpen(true)), menuItem('Share team sheet', 'Image of your best 23 for messages or socials', () => saveTeamSheet(board, true)), menuItem('Copy team as text', 'B: … HB: … for pasting into a chat', copyText), menuItem('Back up', 'Download all votes and teams (every season) as a file', () => downloadBackup({
+    votes,
+    ratings,
+    board
+  })), menuItem('Restore from backup', 'Load a backup file, e.g. one made on your computer', () => fileRef.current && fileRef.current.click()), menuItem('Desktop view', 'The full magnet board, stats, H2H and fixture', () => {
+    try {
+      localStorage.setItem('carlton-view', 'desktop');
+    } catch {}
+    location.reload();
+  })), syncOpen && /*#__PURE__*/React.createElement(Sheet, {
+    title: "Sync votes",
+    onClose: () => setSyncOpen(false)
+  }, /*#__PURE__*/React.createElement(SyncPanel, {
+    sync: sync
+  })), /*#__PURE__*/React.createElement("input", {
+    ref: fileRef,
+    type: "file",
+    accept: ".json,application/json",
+    style: {
+      display: 'none'
+    },
+    onChange: e => restoreBackupFile(e, d => {
+      if (d.votes) setVotes(d.votes);
+      if (d.ratings) setRatings(d.ratings);
+      if (d.board) setBoard(d.board);
+    })
+  }));
+}
+function Root() {
+  const [year, setYear] = useState(() => {
+    try {
+      return localStorage.getItem('carlton-season') || '2027';
+    } catch {
+      return '2027';
+    }
+  });
+  applySeason(year);
+  const switchSeason = y => {
+    try {
+      localStorage.setItem('carlton-season', y);
+    } catch {}
+    setYear(y);
+  };
+  return window.CARLTON_MOBILE ? /*#__PURE__*/React.createElement(MobileApp, {
+    key: year,
+    onSeason: switchSeason
+  }) : /*#__PURE__*/React.createElement(App, {
+    key: year,
+    onSeason: switchSeason
+  });
+}
+ReactDOM.createRoot(document.getElementById('root')).render( /*#__PURE__*/React.createElement(Root, null));
