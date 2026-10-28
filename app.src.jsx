@@ -3270,11 +3270,40 @@
       fontSize: '13px', fontWeight: '700', cursor: 'pointer',
     });
 
+    // Opened from the iPhone home-screen icon (navigator.standalone): the full screen height.
+    // Some iOS 26 releases size full-screen layouts there short by about the status bar's height,
+    // leaving a strip along the bottom, so the shell and sheets use the physical screen instead.
+    // Null in Safari, where `inset: 0` has to keep tracking the toolbars.
+    const standaloneHeight = () => {
+      if (navigator.standalone !== true) return null;
+      const landscape = window.innerWidth > window.innerHeight;
+      const screenH = landscape ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+      return Math.max(window.innerHeight, screenH);
+    };
+
+    const useStandaloneHeight = () => {
+      const [h, setH] = useState(standaloneHeight);
+      useEffect(() => {
+        const update = () => setH(standaloneHeight());
+        window.addEventListener('resize', update);
+        window.addEventListener('orientationchange', update);
+        return () => {
+          window.removeEventListener('resize', update);
+          window.removeEventListener('orientationchange', update);
+        };
+      }, []);
+      return h;
+    };
+
     // Visible part of the screen in px. On iPhones it shrinks while the keyboard is up.
     const useVisibleViewport = () => {
       const read = () => {
         const vv = window.visualViewport;
-        return vv ? { height: Math.round(vv.height), top: Math.round(vv.offsetTop) } : { height: window.innerHeight, top: 0 };
+        const h = vv ? vv.height : window.innerHeight;
+        const full = standaloneHeight();
+        // Home-screen app with no keyboard up: the whole screen (see standaloneHeight)
+        const height = full && h > window.innerHeight - 80 ? full : h;
+        return { height: Math.round(height), top: vv ? Math.round(vv.offsetTop) : 0 };
       };
       const [view, setView] = useState(read);
       useEffect(() => {
@@ -3282,9 +3311,11 @@
         const update = () => setView(read());
         (vv || window).addEventListener('resize', update);
         if (vv) vv.addEventListener('scroll', update);
+        window.addEventListener('orientationchange', update);
         return () => {
           (vv || window).removeEventListener('resize', update);
           if (vv) vv.removeEventListener('scroll', update);
+          window.removeEventListener('orientationchange', update);
         };
       }, []);
       return view;
@@ -3816,6 +3847,7 @@
       const { toast, showToast, runUndo } = useUndoToast();
       const sync = useVoteSync(votes, setVotes);
       const [syncOpen, setSyncOpen] = useState(false);
+      const fullH = useStandaloneHeight();
 
       useEffect(() => { try { localStorage.setItem('carlton-mobile-tab', tab); } catch {} }, [tab]);
       useEffect(() => { try { localStorage.setItem(`carlton-board-${S_YEAR}`, JSON.stringify(board)); } catch {} }, [board]);
@@ -3845,7 +3877,10 @@
       ];
 
       return (
-        <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column' }}>
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, ...(fullH ? { height: fullH } : { bottom: 0 }),
+          display: 'flex', flexDirection: 'column',
+        }}>
           <div style={{
             flexShrink: 0, display: 'flex', alignItems: 'center', gap: '10px',
             padding: 'calc(env(safe-area-inset-top) + 10px) 14px 10px',

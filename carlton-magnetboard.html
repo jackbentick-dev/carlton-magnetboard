@@ -28,13 +28,16 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; }
+    /* Solid base colour: iPhones paint any area outside the page with it (white when unset) */
+    html { background-color: #060d1a; }
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       overflow: hidden;
       background:
         radial-gradient(1100px 700px at 78% -12%, rgba(30,64,175,0.30) 0%, rgba(30,64,175,0) 60%),
         radial-gradient(900px 620px at -8% 112%, rgba(13,148,136,0.10) 0%, rgba(13,148,136,0) 55%),
-        linear-gradient(160deg, #04070d 0%, #0a1526 45%, #05090f 100%);
+        linear-gradient(160deg, #04070d 0%, #0a1526 45%, #05090f 100%),
+        #060d1a;
       background-attachment: fixed;
       -webkit-font-smoothing: antialiased;
     }
