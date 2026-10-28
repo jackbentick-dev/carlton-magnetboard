@@ -2510,6 +2510,7 @@
               type="password" value={token} onChange={(e) => setToken(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') connect(); }}
               placeholder="ghp_…" autoComplete="off" spellCheck={false}
+              onBlur={unshiftAfterKeyboard}
               style={{
                 flex: 1, minWidth: 0, padding: '11px 12px', borderRadius: '10px',
                 background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)',
@@ -3269,37 +3270,78 @@
       fontSize: '13px', fontWeight: '700', cursor: 'pointer',
     });
 
-    // Bottom sheet: tap the backdrop or Done to close
-    const Sheet = ({ title, onClose, children }) => (
-      <div onClick={onClose} style={{
-        position: 'fixed', inset: 0, zIndex: 4000, background: 'rgba(2,6,14,0.6)',
-        display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-        animation: 'fade-in 0.15s ease',
-      }}>
-        <div onClick={(e) => e.stopPropagation()} style={{
-          maxHeight: 'calc(100% - 44px)', display: 'flex', flexDirection: 'column',
-          background: `linear-gradient(180deg, ${CARLTON_NAVY_LIGHT} 0%, ${CARLTON_NAVY} 35%, ${CARLTON_NAVY_DARK} 100%)`,
-          borderRadius: '20px 20px 0 0', border: '1px solid rgba(255,255,255,0.12)', borderBottom: 'none',
-          boxShadow: '0 -20px 50px rgba(0,0,0,0.5)',
-          paddingBottom: 'env(safe-area-inset-bottom)',
-          animation: 'sheet-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)',
+    // Visible part of the screen in px. On iPhones it shrinks while the keyboard is up.
+    const useVisibleViewport = () => {
+      const read = () => {
+        const vv = window.visualViewport;
+        return vv ? { height: Math.round(vv.height), top: Math.round(vv.offsetTop) } : { height: window.innerHeight, top: 0 };
+      };
+      const [view, setView] = useState(read);
+      useEffect(() => {
+        const vv = window.visualViewport;
+        const update = () => setView(read());
+        (vv || window).addEventListener('resize', update);
+        if (vv) vv.addEventListener('scroll', update);
+        return () => {
+          (vv || window).removeEventListener('resize', update);
+          if (vv) vv.removeEventListener('scroll', update);
+        };
+      }, []);
+      return view;
+    };
+
+    // After the iPhone keyboard closes, Safari can leave the page shifted up; put it back
+    const unshiftAfterKeyboard = () => setTimeout(() => window.scrollTo(0, 0), 60);
+
+    // Bottom sheet: tap the backdrop or Done to close. It renders into <body> (a portal): left inside
+    // the page's scroll area, iPhone Safari hands a swipe that hits the end of the list to the page
+    // behind it, so the list feels stuck. Heights are explicit pixels from the visible screen rather
+    // than flexbox shrinking, which older Safari gets wrong, so the list always fits above the keyboard.
+    // `pinned` stays above the scrolling part (e.g. the picker's search and filters).
+    const Sheet = ({ title, onClose, children, pinned }) => {
+      const view = useVisibleViewport();
+      const headRef = useRef(null);
+      const [headH, setHeadH] = useState(64);
+      useLayoutEffect(() => { if (headRef.current) setHeadH(headRef.current.offsetHeight); });
+      const panelMax = Math.max(240, view.height - 44);
+
+      return ReactDOM.createPortal(
+        <div onClick={onClose} style={{
+          position: 'fixed', left: 0, right: 0, top: view.top, height: view.height, zIndex: 4000,
+          background: 'rgba(2,6,14,0.6)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+          animation: 'fade-in 0.15s ease',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '8px' }}>
-            <span style={{ width: '40px', height: '5px', borderRadius: '3px', background: 'rgba(255,255,255,0.22)' }}></span>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            maxHeight: panelMax, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            background: `linear-gradient(180deg, ${CARLTON_NAVY_LIGHT} 0%, ${CARLTON_NAVY} 35%, ${CARLTON_NAVY_DARK} 100%)`,
+            borderRadius: '20px 20px 0 0', border: '1px solid rgba(255,255,255,0.12)', borderBottom: 'none',
+            boxShadow: '0 -20px 50px rgba(0,0,0,0.5)',
+            animation: 'sheet-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)',
+          }}>
+            <div ref={headRef} style={{ flexShrink: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '8px' }}>
+                <span style={{ width: '40px', height: '5px', borderRadius: '3px', background: 'rgba(255,255,255,0.22)' }}></span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px 10px' }}>
+                <span style={{ color: '#fff', fontSize: '17px', fontWeight: '800' }}>{title}</span>
+                <button onClick={onClose} style={{
+                  padding: '7px 14px', borderRadius: '999px', border: 'none', cursor: 'pointer',
+                  background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', fontWeight: '700',
+                }}>Done</button>
+              </div>
+              {pinned && <div style={{ padding: '0 16px' }}>{pinned}</div>}
+            </div>
+            <div style={{
+              maxHeight: panelMax - headH, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
+              padding: '0 16px calc(18px + env(safe-area-inset-bottom))',
+            }}>
+              {children}
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px 10px' }}>
-            <span style={{ color: '#fff', fontSize: '17px', fontWeight: '800' }}>{title}</span>
-            <button onClick={onClose} style={{
-              padding: '7px 14px', borderRadius: '999px', border: 'none', cursor: 'pointer',
-              background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', fontWeight: '700',
-            }}>Done</button>
-          </div>
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '0 16px 18px' }}>
-            {children}
-          </div>
-        </div>
-      </div>
-    );
+        </div>,
+        document.body
+      );
+    };
 
     const SlotTile = ({ label, player, onTap, highlight }) => (
       <button onClick={onTap} style={{
@@ -3351,13 +3393,14 @@
         .sort((a, b) => byRating ? (ra.avg[b.name] ?? -99) - (ra.avg[a.name] ?? -99) : a.number - b.number);
 
       return (
-        <Sheet title={targetLabel(target)} onClose={onClose}>
+        <Sheet title={targetLabel(target)} onClose={onClose} pinned={<>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Name or number"
               spellCheck={false}
+              onBlur={unshiftAfterKeyboard}
               style={{
                 flex: 1, minWidth: 0, padding: '11px 14px',
                 background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
@@ -3373,6 +3416,7 @@
               <button key={k} onClick={() => setPos(k)} style={{ ...chipStyle(pos === k), flex: 1, padding: '8px 0' }}>{k === 'ALL' ? 'All' : k}</button>
             ))}
           </div>
+        </>}>
           {avail.length === 0 && (
             <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '14px', textAlign: 'center', padding: '28px 10px' }}>
               {q ? `Nobody left matching “${q}”` : `No ${pos === 'ALL' ? '' : pos + ' '}players left to pick`}
