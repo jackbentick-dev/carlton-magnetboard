@@ -3245,9 +3245,28 @@
     // ============================ MOBILE ============================
     // Phones get their own layout (the head script in the HTML decides): a tap-to-pick team
     // sheet and one-round-at-a-time B&F voting. Same localStorage keys as the desktop board.
+    // Styled like a native iPhone app: system font, translucent nav and tab bars that content
+    // scrolls under, large titles, segmented controls and grouped cards. Colours live in `M`.
 
     const OSWALD = "'Oswald', 'Inter', sans-serif";
+    const M = {
+      font: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif",
+      card: 'rgba(255,255,255,0.05)',
+      cardHi: 'rgba(255,255,255,0.085)',
+      fill: 'rgba(255,255,255,0.09)',        // control backgrounds: search field, segmented track
+      sep: 'rgba(255,255,255,0.08)',
+      text2: 'rgba(235,241,255,0.64)',
+      text3: 'rgba(235,241,255,0.40)',
+      gold: '#f5b83d',
+      green: '#34c759',
+      warn: '#ffcf66',
+      bar: 'rgba(9,17,33,0.78)',             // nav and tab bars, blurred
+      blur: 'saturate(180%) blur(20px)',
+      navH: 'calc(env(safe-area-inset-top) + 52px)',
+      tabH: 'calc(env(safe-area-inset-bottom) + 56px)',
+    };
     const LINE_FILTER = { B: 'DEF', HB: 'DEF', C: 'MID', HF: 'FWD', F: 'FWD', FOL: 'MID' };
+    const LINE_NAMES = { B: 'Backs', HB: 'Half-backs', C: 'Centres', HF: 'Half-forwards', F: 'Forwards', FOL: 'Followers' };
     const sameTarget = (a, b) => !!a && !!b && a.key === b.key && a.bench === b.bench;
     const POS_LONG = {
       BP: 'Back pocket', FB: 'Full back', HBF: 'Half-back flank', CHB: 'Centre half-back',
@@ -3255,6 +3274,7 @@
       FP: 'Forward pocket', FF: 'Full forward', R: 'Ruck', RR: 'Ruck-rover', ROV: 'Rover',
     };
     const targetLabel = (t) => t.bench !== undefined ? `Interchange ${t.bench + 1}` : POS_LONG[TEAM_SLOTS.find(s => s.key === t.key).pos];
+    const roundName = (g) => g.tag || (g.round === 'OR' ? 'Opening Round' : `Round ${g.round.slice(1)}`);
 
     // Average Wheelo rating by name: this season, or last season before the first game
     const ratingAverages = () => {
@@ -3270,13 +3290,139 @@
       return { year, avg };
     };
 
-    const chipStyle = (on) => ({
-      padding: '8px 13px', borderRadius: '999px', flexShrink: 0,
-      background: on ? 'linear-gradient(135deg, #ffffff 0%, #dce5f2 100%)' : 'rgba(255,255,255,0.06)',
-      color: on ? CARLTON_NAVY : 'rgba(255,255,255,0.6)',
-      border: on ? '1px solid transparent' : '1px solid rgba(255,255,255,0.1)',
-      fontSize: '13px', fontWeight: '700', cursor: 'pointer',
-    });
+    // ---- Building blocks ----
+
+    const ICON_PATHS = {
+      shirt: 'M7.5 3.5 3.5 6l1.8 3.6 1.7-.8V20.5h10V8.8l1.7.8L20.5 6l-4-2.5c-.7 1.4-2.4 2.3-4.5 2.3S8.2 4.9 7.5 3.5z',
+      medal: 'M8.5 2.5h7l-2.3 6h-2.4zM12 21.5a5.8 5.8 0 1 0 0-11.6 5.8 5.8 0 0 0 0 11.6z',
+      cloud: 'M7 18.5h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.4 9.2 4.6 4.6 0 0 0 7 18.5z',
+      share: 'M12 14.5V3.5M8 7.5l4-4 4 4M7 10.5H5.5v10h13v-10H17',
+      copy: 'M8.5 8.5h11v11h-11zM15.5 8.5v-4h-11v11h4',
+      trash: 'M4.5 6.5h15M9.5 6.5V4h5v2.5M6.5 6.5l1 13.5h9l1-13.5',
+      chevL: 'M14.5 5.5 8 12l6.5 6.5',
+      chevR: 'M9.5 5.5 16 12l-6.5 6.5',
+      chevD: 'M6.5 9.5 12 15l5.5-5.5',
+      plus: 'M12 5.5v13M5.5 12h13',
+      swap: 'M7 8h11.5l-3.5-3.5M17 16H5.5L9 19.5',
+      replace: 'M4.5 12a7.5 7.5 0 0 1 12.8-5.3L19.5 9M19.5 4.5V9H15M19.5 12a7.5 7.5 0 0 1-12.8 5.3L4.5 15M4.5 19.5V15H9',
+      search: 'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM20 20l-4.6-4.6',
+      download: 'M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14',
+      upload: 'M12 15.5v-11M7.5 9 12 4.5 16.5 9M5 19.5h14',
+      desktop: 'M3.5 5h17v11h-17zM9 20h6M12 16v4',
+      alert: 'M12 4 2.8 19.5h18.4zM12 10v4.5M12 17.2v.3',
+    };
+    const Icon = ({ name, size = 22, width = 1.8 }) => name === 'more' ? (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <circle cx="5.5" cy="12" r="1.9" /><circle cx="12" cy="12" r="1.9" /><circle cx="18.5" cy="12" r="1.9" />
+      </svg>
+    ) : (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={width}
+        strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d={ICON_PATHS[name]} />
+      </svg>
+    );
+
+    const IconButton = ({ icon, label, onClick, badge, disabled, size = 38 }) => (
+      <button onClick={onClick} aria-label={label} disabled={disabled} style={{
+        position: 'relative', width: size, height: size, borderRadius: size / 2, flexShrink: 0,
+        border: 'none', background: M.fill, color: '#fff', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.3 : 1,
+      }}>
+        <Icon name={icon} size={size * 0.55} />
+        {badge && (
+          <span style={{
+            position: 'absolute', right: 4, top: 4, width: 10, height: 10, borderRadius: 5,
+            background: badge, border: '2px solid #0b1424',
+          }}></span>
+        )}
+      </button>
+    );
+
+    // iOS-style segmented control: white thumb with navy text on the active segment
+    const Segmented = ({ options, value, onChange, small, style }) => (
+      <div style={{ display: 'flex', padding: 2, gap: 2, borderRadius: 10, background: M.fill, ...style }}>
+        {options.map(([k, label]) => (
+          <button key={k} onClick={() => onChange(k)} style={{
+            flex: 1, padding: small ? '5px 11px' : '7px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
+            background: value === k ? '#fff' : 'transparent', color: value === k ? CARLTON_NAVY : 'rgba(255,255,255,0.78)',
+            boxShadow: value === k ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
+            fontSize: small ? 13 : 14, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap',
+            transition: 'background 0.18s ease, color 0.18s ease',
+          }}>{label}</button>
+        ))}
+      </div>
+    );
+
+    const MButton = ({ children, onClick, kind = 'secondary', icon, style, disabled }) => (
+      <button onClick={onClick} disabled={disabled} style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        padding: '13px 16px', borderRadius: 13, border: 'none', cursor: 'pointer',
+        fontSize: 15, fontWeight: 600, fontFamily: 'inherit',
+        background: kind === 'primary' ? '#fff' : kind === 'danger' ? 'rgba(255,69,58,0.14)' : M.cardHi,
+        color: kind === 'primary' ? CARLTON_NAVY : kind === 'danger' ? '#ff6961' : '#fff',
+        opacity: disabled ? 0.4 : 1, ...style,
+      }}>
+        {icon && <Icon name={icon} size={18} />}
+        {children}
+      </button>
+    );
+
+    const Card = ({ children, style }) => (
+      <div style={{ background: M.card, border: `1px solid ${M.sep}`, borderRadius: 18, ...style }}>{children}</div>
+    );
+
+    const SectionHeader = ({ children, right }) => (
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '0 4px', margin: '22px 0 8px' }}>
+        <span style={{ color: M.text2, fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{children}</span>
+        {right && <span style={{ color: M.text3, fontSize: 13 }}>{right}</span>}
+      </div>
+    );
+
+    // Large page title with the season switch beside it; collapses into the nav bar on scroll
+    const LargeTitle = ({ title, subtitle, onSeason }) => (
+      <div style={{ padding: '4px 4px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <h1 style={{ margin: 0, fontSize: 32, fontWeight: 700, letterSpacing: '0.2px', color: '#fff', lineHeight: 1.15 }}>{title}</h1>
+          <Segmented small options={Object.keys(SEASONS).map(y => [y, y])} value={String(S_YEAR)}
+            onChange={(y) => { if (y !== String(S_YEAR) && onSeason) onSeason(y); }} />
+        </div>
+        {subtitle && <div style={{ color: M.text2, fontSize: 15, marginTop: 3 }}>{subtitle}</div>}
+      </div>
+    );
+
+    // Club logos are mostly dark (Carlton's is navy), so on the dark app they sit on a white disc
+    const LogoDisc = ({ team, size = 40 }) => (
+      <span style={{
+        width: size, height: size, borderRadius: size / 2, background: 'rgba(255,255,255,0.95)', flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+      }}>
+        <ClubLogo team={team} size={Math.round(size * 0.74)} />
+      </span>
+    );
+
+    const EmptyState = ({ icon, title, text }) => (
+      <Card style={{ marginTop: 18, padding: '34px 22px', textAlign: 'center' }}>
+        <div style={{ width: 56, height: 56, borderRadius: 28, margin: '0 auto 14px', background: M.fill, color: M.text2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={icon} size={28} />
+        </div>
+        <div style={{ fontSize: 17, fontWeight: 600 }}>{title}</div>
+        <div style={{ color: M.text2, fontSize: 15, marginTop: 6, lineHeight: 1.45 }}>{text}</div>
+      </Card>
+    );
+
+    const Ring = ({ value, max, size = 60 }) => {
+      const r = (size - 6) / 2, c = 2 * Math.PI * r, done = value >= max;
+      return (
+        <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+          <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }} aria-hidden="true">
+            <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="5" />
+            <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={done ? M.green : '#fff'} strokeWidth="5" strokeLinecap="round"
+              strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(1, value / max))} style={{ transition: 'stroke-dashoffset 0.4s ease' }} />
+          </svg>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: OSWALD, fontSize: 20, fontWeight: 600 }}>{value}</div>
+        </div>
+      );
+    };
 
     // Visible part of the screen in px. On iPhones it shrinks while the keyboard is up.
     const useVisibleViewport = () => {
@@ -3347,36 +3493,36 @@
       return ReactDOM.createPortal(
         <div onClick={close} style={{
           position: 'fixed', left: 0, right: 0, top: view.top, height: view.height, zIndex: 4000,
-          background: 'rgba(2,6,14,0.6)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-          animation: 'fade-in 0.15s ease',
+          background: 'rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+          fontFamily: M.font, color: '#fff', animation: 'fade-in 0.15s ease',
           opacity: closing ? 0 : 1 - Math.min(drag / 500, 0.5), transition: 'opacity 0.2s ease',
         }}>
           <div onClick={(e) => e.stopPropagation()} style={{
             maxHeight: panelMax, display: 'flex', flexDirection: 'column', overflow: 'hidden',
-            background: `linear-gradient(180deg, ${CARLTON_NAVY_LIGHT} 0%, ${CARLTON_NAVY} 35%, ${CARLTON_NAVY_DARK} 100%)`,
-            borderRadius: '20px 20px 0 0', border: '1px solid rgba(255,255,255,0.12)', borderBottom: 'none',
-            boxShadow: '0 -20px 50px rgba(0,0,0,0.5)',
-            animation: 'sheet-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)',
+            background: '#0e1a30', borderRadius: '22px 22px 0 0',
+            boxShadow: '0 -10px 40px rgba(0,0,0,0.45)',
+            animation: 'sheet-up 0.26s cubic-bezier(0.2, 0.8, 0.2, 1)',
             transform: closing ? 'translateY(100%)' : `translateY(${drag}px)`,
             transition: dragging ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
           }}>
             <div ref={headRef} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
               style={{ flexShrink: 0, touchAction: 'none', cursor: 'grab' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '8px' }}>
-                <span style={{ width: '40px', height: '5px', borderRadius: '3px', background: 'rgba(255,255,255,0.22)' }}></span>
+              <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 7 }}>
+                <span style={{ width: 36, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.25)' }}></span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px 10px' }}>
-                <span style={{ color: '#fff', fontSize: '17px', fontWeight: '800' }}>{title}</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr 64px', alignItems: 'center', padding: '6px 12px 10px' }}>
+                <span></span>
+                <span style={{ textAlign: 'center', fontSize: 17, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</span>
                 <button onClick={close} style={{
-                  padding: '7px 14px', borderRadius: '999px', border: 'none', cursor: 'pointer',
-                  background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', fontWeight: '700',
+                  justifySelf: 'end', padding: '6px 4px', border: 'none', background: 'transparent', cursor: 'pointer',
+                  color: '#fff', fontSize: 17, fontWeight: 600, fontFamily: 'inherit',
                 }}>Done</button>
               </div>
               {pinned && <div style={{ padding: '0 16px' }}>{pinned}</div>}
             </div>
             <div ref={bodyRef} style={{
               maxHeight: panelMax - headH, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
-              padding: '0 16px calc(18px + env(safe-area-inset-bottom))',
+              padding: '0 16px calc(20px + env(safe-area-inset-bottom))',
             }}>
               {children}
             </div>
@@ -3386,37 +3532,37 @@
       );
     };
 
+    // ---- Best 23 ----
+
     const SlotTile = ({ label, player, onTap, highlight }) => (
-      <button onClick={onTap} style={{
-        position: 'relative', minWidth: 0, height: '88px', padding: '16px 6px 8px', borderRadius: '13px',
-        background: player ? `linear-gradient(145deg, ${CARLTON_NAVY_LIGHT} 0%, ${CARLTON_NAVY} 100%)` : 'rgba(255,255,255,0.025)',
-        border: highlight ? '2px solid #60a5fa'
-          : player ? (player.captain ? '1.5px solid #fbbf24' : '1px solid rgba(255,255,255,0.14)')
-          : '1.5px dashed rgba(255,255,255,0.14)',
-        boxShadow: highlight ? '0 0 0 4px rgba(96,165,250,0.18)' : player ? '0 4px 12px rgba(0,0,0,0.3)' : 'none',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px',
-        color: '#fff', cursor: 'pointer', textAlign: 'center',
+      <button onClick={onTap} aria-label={player ? `${label}: ${player.name}` : `Add ${label}`} style={{
+        position: 'relative', minWidth: 0, height: 104, padding: '18px 6px 10px', borderRadius: 16,
+        background: player ? M.cardHi : 'rgba(255,255,255,0.025)',
+        border: highlight ? '2px solid #fff' : `1px solid ${player ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.06)'}`,
+        boxShadow: highlight ? '0 0 0 4px rgba(255,255,255,0.14)' : 'none',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+        color: '#fff', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s ease',
       }}>
-        <span style={{ position: 'absolute', top: '6px', left: '8px', fontSize: '9.5px', fontWeight: '800', letterSpacing: '0.5px', color: 'rgba(255,255,255,0.38)' }}>{label}</span>
+        <span style={{ position: 'absolute', top: 7, left: 9, fontSize: 10.5, fontWeight: 600, color: M.text3, letterSpacing: '0.3px' }}>{label}</span>
         {player && player.captain && (
           <span style={{
-            position: 'absolute', top: '-6px', right: '-6px', width: '19px', height: '19px', borderRadius: '50%',
-            background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)', color: '#000',
-            fontSize: '10px', fontWeight: '900', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            position: 'absolute', top: 6, right: 7, width: 18, height: 18, borderRadius: 9, background: M.gold,
+            color: '#2a1d00', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>C</span>
         )}
         {player ? (
           <>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <PlayerPhoto player={player} size={30} />
-              <span style={{ fontFamily: OSWALD, fontSize: '21px', fontWeight: '600', lineHeight: 1 }}>{numLabel(player)}</span>
-            </span>
-            <span style={{ fontSize: '12.5px', fontWeight: '700', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {surname(player)}
+            <PlayerPhoto player={player} size={42} />
+            <span style={{ display: 'flex', alignItems: 'baseline', gap: 5, maxWidth: '100%', minWidth: 0 }}>
+              <span style={{ fontFamily: OSWALD, fontSize: 18, fontWeight: 600, lineHeight: 1, flexShrink: 0 }}>{numLabel(player)}</span>
+              <span style={{ fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{surname(player)}</span>
             </span>
           </>
         ) : (
-          <span style={{ fontSize: '24px', fontWeight: '300', color: 'rgba(255,255,255,0.28)', lineHeight: 1 }}>+</span>
+          <span style={{
+            width: 34, height: 34, borderRadius: 17, background: 'rgba(255,255,255,0.07)', color: M.text2,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: -6,
+          }}><Icon name="plus" size={18} /></span>
         )}
       </button>
     );
@@ -3447,71 +3593,76 @@
       return (
         <Sheet title={targetLabel(target)} onClose={onClose} scrollKey={targetKey(target)} pinned={<>
           {onSkip && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '-2px 0 10px' }}>
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12.5px', fontWeight: '600' }}>
-                {picked} of 23 picked • moves to the next empty spot
-              </span>
-              <button onClick={onSkip} style={{ ...chipStyle(false), padding: '6px 12px', fontSize: '12.5px' }}>Skip ›</button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '-4px 2px 10px' }}>
+              <span style={{ color: M.text2, fontSize: 14 }}>Pick {Math.min(23, picked + 1)} of 23</span>
+              <button onClick={onSkip} style={{
+                border: 'none', background: 'transparent', color: '#fff', fontSize: 15, fontWeight: 600,
+                fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2, padding: '4px 0',
+              }}>Skip <Icon name="chevR" size={16} width={2.2} /></button>
             </div>
           )}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Name or number"
-              spellCheck={false}
-              onBlur={unshiftAfterKeyboard}
-              style={{
-                flex: 1, minWidth: 0, padding: '11px 14px',
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: '10px', color: '#fff', fontSize: '16px', fontFamily: 'Inter, sans-serif', outline: 'none',
-              }}
-            />
-            <button onClick={() => setByRating(!byRating)} title="Sort order" style={{ ...chipStyle(byRating), borderRadius: '10px', padding: '0 12px' }}>
-              {byRating ? 'Rating ↓' : 'No. ↑'}
-            </button>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <label style={{
+              flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '0 10px',
+              height: 38, borderRadius: 10, background: M.fill, color: M.text3,
+            }}>
+              <Icon name="search" size={17} />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search players"
+                spellCheck={false}
+                onBlur={unshiftAfterKeyboard}
+                style={{
+                  flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent',
+                  color: '#fff', fontSize: 16, fontFamily: 'inherit',
+                }}
+              />
+            </label>
+            <Segmented small options={[['no', 'No.'], ['rt', 'Rating']]} value={byRating ? 'rt' : 'no'} onChange={(k) => setByRating(k === 'rt')} />
           </div>
-          <div style={{ display: 'flex', gap: '6px', paddingBottom: '10px' }}>
-            {['ALL', 'DEF', 'MID', 'RUCK', 'FWD'].map(k => (
-              <button key={k} onClick={() => setPos(k)} style={{ ...chipStyle(pos === k), flex: 1, padding: '8px 0' }}>{k === 'ALL' ? 'All' : k}</button>
-            ))}
-          </div>
+          <Segmented options={[['ALL', 'All'], ['DEF', 'Def'], ['MID', 'Mid'], ['RUCK', 'Ruck'], ['FWD', 'Fwd']]}
+            value={pos} onChange={setPos} style={{ marginBottom: 6 }} />
         </>}>
           {avail.length === 0 && (
-            <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '14px', textAlign: 'center', padding: '28px 10px' }}>
-              {q ? `Nobody left matching “${q}”` : `No ${pos === 'ALL' ? '' : pos + ' '}players left to pick`}
-              {pos !== 'ALL' && <div><button onClick={() => setPos('ALL')} style={{ ...chipStyle(true), marginTop: '12px' }}>Show everyone</button></div>}
+            <div style={{ color: M.text2, fontSize: 15, textAlign: 'center', padding: '30px 10px' }}>
+              {q ? `Nobody left matching “${q}”` : `No ${pos === 'ALL' ? '' : (POS_NAMES[pos] || pos).toLowerCase() + 's '}left to pick`}
+              {pos !== 'ALL' && <div style={{ marginTop: 14 }}><MButton onClick={() => setPos('ALL')} style={{ margin: '0 auto' }}>Show everyone</MButton></div>}
             </div>
           )}
           {avail.map(p => (
             <button key={p.id} onClick={() => onPick(p.id)} style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: '11px',
-              padding: '10px 4px', background: 'transparent', border: 'none',
-              borderBottom: '1px solid rgba(255,255,255,0.06)', color: '#fff', cursor: 'pointer', textAlign: 'left',
+              width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0',
+              background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
             }}>
-              <PlayerPhoto player={p} size={42} />
-              <span style={{ fontFamily: OSWALD, fontSize: '22px', fontWeight: '600', minWidth: '28px', textAlign: 'center' }}>{numLabel(p)}</span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: '15px', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {p.name}{p.captain ? ' ©' : ''}
+              <PlayerPhoto player={p} size={44} />
+              <span style={{
+                flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10,
+                alignSelf: 'stretch', borderBottom: `1px solid ${M.sep}`, paddingBottom: 9, marginBottom: -9,
+              }}>
+                <span style={{ fontFamily: OSWALD, fontSize: 20, fontWeight: 600, minWidth: 26, textAlign: 'center' }}>{numLabel(p)}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {p.name}{p.captain ? ' (c)' : ''}
+                  </span>
+                  <span style={{ display: 'block', fontSize: 13, color: M.text2, marginTop: 1 }}>
+                    {POS_NAMES[p.position] || p.position} · {p.height}cm · {calculateAge(p.dob)}
+                  </span>
                 </span>
-                <span style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.45)', marginTop: '2px' }}>
-                  {p.position} • {p.height}cm • {calculateAge(p.dob)}y
-                </span>
+                {ra.avg[p.name] !== undefined && (
+                  <span style={{ textAlign: 'right', paddingRight: 2 }}>
+                    <span style={{ display: 'block', color: '#60a5fa', fontSize: 16, fontWeight: 600 }}>{ra.avg[p.name].toFixed(1)}</span>
+                    <span style={{ display: 'block', color: M.text3, fontSize: 11 }}>{ra.year === S_YEAR ? 'avg' : `${ra.year} avg`}</span>
+                  </span>
+                )}
               </span>
-              {ra.avg[p.name] !== undefined && (
-                <span style={{ textAlign: 'right' }}>
-                  <span style={{ display: 'block', color: '#60a5fa', fontSize: '14px', fontWeight: '800' }}>{ra.avg[p.name].toFixed(1)}</span>
-                  <span style={{ display: 'block', color: 'rgba(255,255,255,0.3)', fontSize: '9px', fontWeight: '700' }}>{ra.year === S_YEAR ? 'AVG' : `${ra.year} AVG`}</span>
-                </span>
-              )}
             </button>
           ))}
         </Sheet>
       );
     };
 
-    const MobileTeam = ({ board, setBoard, votes, showToast }) => {
+    const MobileTeam = ({ board, setBoard, votes, showToast, onSeason, setNavTitle }) => {
       const a = slotsFromBoard(board);
       const [picker, setPicker] = useState(null);
       const [detail, setDetail] = useState(null);
@@ -3549,13 +3700,6 @@
         setBoard(prev => { const n = { ...prev }; delete n[id]; return n; });
         showToast(`${playerById(id).name} removed`, () => setBoard(before));
       };
-      const clearAll = () => {
-        const before = board;
-        const n = Object.keys(before).length;
-        if (!n) return;
-        setBoard({});
-        showToast(`Team cleared (${n} player${n === 1 ? '' : 's'})`, () => setBoard(before));
-      };
 
       const tap = (t) => {
         if (moving) {
@@ -3573,94 +3717,99 @@
       const { comp, warnings } = teamBalance(selected, fieldCount);
       const complete = fieldCount === 18 && benchCount === 5;
       const detailPlayer = detail && playerById(detail.id);
+      useEffect(() => { setNavTitle(`Best 23 · ${selected.length}/23`); }, [selected.length]);
+
+      const copyText = async () => {
+        const text = teamText(board);
+        try { await navigator.clipboard.writeText(text); showToast('Team copied'); return; } catch {}
+        if (navigator.share) { try { await navigator.share({ text }); return; } catch {} }
+        window.prompt('Copy your team:', text);
+      };
 
       const tile = (t, label) => {
         const pl = playerById(getT(a, t));
         return <SlotTile key={t.key || 'b' + t.bench} label={label} player={pl} onTap={() => tap(t)} highlight={moving && sameTarget(moving.target, t)} />;
       };
-      const rowLabel = (txt) => (
-        <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11px', fontWeight: '800', letterSpacing: '1px', textAlign: 'center' }}>{txt}</span>
-      );
-      const grid = { display: 'grid', gridTemplateColumns: '34px repeat(3, minmax(0, 1fr))', gap: '7px', alignItems: 'center' };
+      const grid = { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 };
 
       return (
-        <div style={{ padding: '12px 14px 24px' }}>
-          {/* Summary: counts, balance, warnings */}
-          <GlassCard style={{ padding: '12px 14px', marginBottom: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              {[['ON FIELD', fieldCount, 18], ['BENCH', benchCount, 5]].map(([l, v, max]) => (
-                <div key={l}>
-                  <div style={{ fontFamily: OSWALD, fontSize: '22px', fontWeight: '600', lineHeight: 1.1, color: v === max ? '#22c55e' : '#fff' }}>
-                    {v}<span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '15px' }}>/{max}</span>
-                  </div>
-                  <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '9px', fontWeight: '700', letterSpacing: '1px' }}>{l}</div>
+        <div>
+          <LargeTitle title="Best 23" subtitle={`${S_YEAR} season · ${selected.length} of 23 picked`} onSeason={onSeason} />
+
+          <Card style={{ marginTop: 16, padding: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <Ring value={selected.length} max={23} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 17, fontWeight: 600 }}>
+                  {complete ? 'Team complete' : selected.length ? `${Math.max(0, 23 - selected.length)} to pick` : 'Pick your 23'}
                 </div>
-              ))}
-              <span style={{ flex: 1 }}></span>
-              <button onClick={() => saveTeamSheet(board, true)} style={{ ...chipStyle(complete), padding: '9px 14px' }}>Share</button>
-              <button onClick={clearAll} disabled={!selected.length} style={{
-                ...chipStyle(false), padding: '9px 12px', color: '#f87171',
-                border: '1px solid rgba(239,68,68,0.3)', opacity: selected.length ? 1 : 0.35,
-              }}>Clear</button>
+                <div style={{ color: M.text2, fontSize: 14, marginTop: 2 }}>
+                  {selected.length ? `${fieldCount}/18 on field · ${benchCount}/5 interchange` : 'Tap any spot to start'}
+                </div>
+              </div>
             </div>
             {comp && (
-              <div style={{ display: 'flex', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                {[['AVG AGE', comp.age.toFixed(1)], ['AVG HT', Math.round(comp.height)], ['TALLS', comp.talls], ['RUCKS', comp.rucks]].map(([l, v]) => (
-                  <div key={l} style={{ flex: 1, textAlign: 'center' }}>
-                    <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: '14px', fontWeight: '700' }}>{v}</div>
-                    <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '8.5px', fontWeight: '700', letterSpacing: '0.8px', marginTop: '1px' }}>{l}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', marginTop: 14, paddingTop: 14, borderTop: `1px solid ${M.sep}` }}>
+                {[['Avg age', comp.age.toFixed(1)], ['Avg height', `${Math.round(comp.height)}`], ['Talls', comp.talls], ['Rucks', comp.rucks]].map(([l, v]) => (
+                  <div key={l} style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 17, fontWeight: 600 }}>{v}</div>
+                    <div style={{ color: M.text3, fontSize: 12, marginTop: 1 }}>{l}</div>
                   </div>
                 ))}
               </div>
             )}
             {warnings.map(w => (
-              <div key={w} style={{
-                marginTop: '8px', padding: '7px 10px', borderRadius: '8px',
-                background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.25)',
-                color: '#fbbf24', fontSize: '12px', fontWeight: '700',
-              }}>{w}</div>
+              <div key={w} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, color: M.warn, fontSize: 14, fontWeight: 500 }}>
+                <Icon name="alert" size={17} /> {w}
+              </div>
             ))}
-          </GlassCard>
+          </Card>
 
           {moving && (
             <div style={{
-              position: 'sticky', top: 0, zIndex: 5, marginBottom: '12px',
-              display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
-              background: 'rgba(29,78,216,0.95)', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-              color: '#fff', fontSize: '13.5px', fontWeight: '600',
+              position: 'sticky', top: `calc(${M.navH} + 8px)`, zIndex: 5, marginTop: 14,
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 10px 14px',
+              background: 'rgba(255,255,255,0.96)', color: CARLTON_NAVY, borderRadius: 14,
+              boxShadow: '0 10px 30px rgba(0,0,0,0.45)', fontSize: 15, fontWeight: 600,
             }}>
+              <Icon name="swap" size={19} />
               <span style={{ flex: 1 }}>Tap where {surname(playerById(moving.id))} should go</span>
-              <button onClick={() => setMoving(null)} style={{ ...chipStyle(true), padding: '7px 12px' }}>Cancel</button>
+              <button onClick={() => setMoving(null)} style={{
+                border: 'none', borderRadius: 9, padding: '7px 12px', background: CARLTON_NAVY, color: '#fff',
+                fontSize: 14, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+              }}>Cancel</button>
             </div>
           )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {TEAM_LINES.map(line => (
-              <div key={line.key} style={grid}>
-                {rowLabel(line.short)}
-                {line.slots.map(s => tile({ key: s.key }, s.pos))}
-              </div>
-            ))}
-          </div>
+          {TEAM_LINES.map(line => (
+            <div key={line.key}>
+              <SectionHeader right={`${line.slots.filter(s => a.slots[s.key]).length}/3`}>{LINE_NAMES[line.key]}</SectionHeader>
+              <div style={grid}>{line.slots.map(s => tile({ key: s.key }, s.pos))}</div>
+            </div>
+          ))}
 
-          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11px', fontWeight: '800', letterSpacing: '1.5px', margin: '18px 0 8px' }}>INTERCHANGE</div>
-          <div style={grid}>
-            {rowLabel('I/C')}
-            {[0, 1, 2].map(i => tile({ bench: i }, `IC${i + 1}`))}
-            <span></span>
-            {[3, 4].map(i => tile({ bench: i }, `IC${i + 1}`))}
-          </div>
+          <SectionHeader right={`${benchCount}/5`}>Interchange</SectionHeader>
+          <div style={grid}>{[0, 1, 2, 3, 4].map(i => tile({ bench: i }, `IC${i + 1}`))}</div>
 
           {a.extra.length > 0 && (
-            <div style={{ marginTop: '16px', color: 'rgba(255,255,255,0.55)', fontSize: '12.5px' }}>
-              Also on the field from the desktop board:
-              {a.extra.map(id => (
-                <button key={id} onClick={() => removeExtra(id)} style={{ ...chipStyle(false), margin: '6px 6px 0 0' }}>
-                  {playerById(id).name} ✕
-                </button>
-              ))}
-            </div>
+            <>
+              <SectionHeader>Also on the field (desktop board)</SectionHeader>
+              <Card style={{ padding: '4px 14px' }}>
+                {a.extra.map((id, i) => (
+                  <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderTop: i ? `1px solid ${M.sep}` : 'none' }}>
+                    <PlayerPhoto player={playerById(id)} size={32} />
+                    <span style={{ flex: 1, fontSize: 15, fontWeight: 600 }}>{playerById(id).name}</span>
+                    <button onClick={() => removeExtra(id)} style={{ border: 'none', background: 'transparent', color: '#ff6961', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}>Remove</button>
+                  </div>
+                ))}
+              </Card>
+            </>
           )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 24 }}>
+            <MButton kind={complete ? 'primary' : 'secondary'} icon="share" onClick={() => saveTeamSheet(board, true)} disabled={!selected.length}>Share team</MButton>
+            <MButton icon="copy" onClick={copyText} disabled={!selected.length}>Copy as text</MButton>
+          </div>
 
           {picker && (
             <PickerSheet
@@ -3683,19 +3832,10 @@
           {detailPlayer && (
             <Sheet title={targetLabel(detail.target)} onClose={() => setDetail(null)}>
               <PlayerSummary player={detailPlayer} votes={votes} />
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '18px' }}>
-                {[
-                  ['Move', () => { setMoving({ target: detail.target, id: detail.id }); setDetail(null); }, false],
-                  ['Change', () => { setPicker({ target: detail.target, chain: false }); setDetail(null); }, false],
-                  ['Remove', () => { remove(detail.target); setDetail(null); }, true],
-                ].map(([label, fn, red]) => (
-                  <button key={label} onClick={fn} style={{
-                    padding: '13px 6px', borderRadius: '11px', cursor: 'pointer',
-                    background: red ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.08)',
-                    border: `1px solid ${red ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.14)'}`,
-                    color: red ? '#f87171' : '#fff', fontSize: '14px', fontWeight: '700',
-                  }}>{label}</button>
-                ))}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 18 }}>
+                <MButton icon="swap" onClick={() => { setMoving({ target: detail.target, id: detail.id }); setDetail(null); }}>Move</MButton>
+                <MButton icon="replace" onClick={() => { setPicker({ target: detail.target, chain: false }); setDetail(null); }}>Change</MButton>
+                <MButton kind="danger" icon="trash" onClick={() => { remove(detail.target); setDetail(null); }}>Remove</MButton>
               </div>
             </Sheet>
           )}
@@ -3703,7 +3843,13 @@
       );
     };
 
-    const MobileVotes = ({ votes, setVotes, ratings }) => {
+    // ---- B&F votes ----
+
+    const RANK_COLORS = { 1: '#f5b83d', 2: '#c7cfda', 3: '#d4915a' };
+    // One distinct colour per vote (the desktop's scoreColors share amber for 1 and 2)
+    const VOTE_COLORS = ['#ff6b6b', '#ff9f43', '#ffd166', '#4cd964', '#60a5fa'];
+
+    const MobileVotes = ({ votes, setVotes, ratings, onSeason, setNavTitle }) => {
       const playable = S_FIXTURE.filter(g => g.opponent !== 'BYE');
       const playedIn = (r) => Object.entries(ratings[r] || {})
         .filter(([, d]) => d && d.rating !== null && d.rating !== undefined)
@@ -3721,17 +3867,31 @@
       const [showAll, setShowAll] = useState(false);
       const rowRefs = useRef({});
 
-      if (!playable.length) return <div style={{ padding: '14px' }}><EmptySeasonCard what="BEST & FAIREST" /></div>;
-
       const idx = playable.findIndex(g => g.round === round);
       const game = playable[idx];
+      const played = game ? playedIn(round) : [];
+      const scored = game ? scoredIn(round) : 0;
+      const target = played.length || null;
+      useEffect(() => {
+        setNavTitle(game ? `${game.round} v ${game.opponent} · ${scored}${target ? '/' + target : ''}` : 'B&F votes');
+      }, [round, scored, target]);
+
+      if (!playable.length) {
+        return (
+          <div>
+            <LargeTitle title="B&F votes" subtitle={`${S_YEAR} season`} onSeason={onSeason} />
+            <EmptyState icon="medal" title={`No ${S_YEAR} fixture yet`}
+              text={`Voting opens once the ${S_YEAR} fixture is released. Your 2026 votes are under 2026.`} />
+          </div>
+        );
+      }
+
       const res = S_RESULTS[round];
-      const played = playedIn(round);
       const playedIds = new Set(played.map(x => x.player.id));
       const others = S_PLAYERS.filter(p => !playedIds.has(p.id)).sort((a, b) => a.number - b.number).map(p => ({ player: p }));
       const list = played.length ? (showAll ? [...played, ...others] : played) : others;
-      const scored = scoredIn(round);
-      const target = played.length || null;
+      const ratedRounds = playable.filter(g => playedIn(g.round).length);
+      const doneRounds = ratedRounds.filter(g => scoredIn(g.round) >= playedIn(g.round).length).length;
 
       const setScore = (pid, s) => {
         const off = votes[pid]?.[round] === s;
@@ -3743,141 +3903,170 @@
         if (next) setTimeout(() => {
           const el = rowRefs.current[next.player.id];
           if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 120);
+        }, 140);
       };
-
       const roundStatus = (r) => {
         const n = playedIn(r).length, s = scoredIn(r);
         return !n ? '' : s >= n ? '  ✓' : s ? `  (${n - s} left)` : '';
       };
-      const arrow = (d) => {
-        const off = idx + d < 0 || idx + d >= playable.length;
-        return (
-          <button onClick={() => !off && setRound(playable[idx + d].round)} disabled={off} style={{
-            width: '44px', flexShrink: 0, borderRadius: '11px', fontSize: '20px', fontWeight: '700',
-            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-            color: '#fff', opacity: off ? 0.25 : 1, cursor: 'pointer',
-          }}>{d < 0 ? '‹' : '›'}</button>
-        );
-      };
 
-      // Leaderboard (same tie-aware ranking as the desktop)
       const totals = S_PLAYERS.map(p => {
         const vs = Object.values(votes[p.id] || {}).filter(v => v !== undefined && v !== null);
         return { player: p, total: vs.reduce((s, v) => s + v, 0), games: vs.length };
       }).filter(x => x.games > 0).sort((a, b) => b.total - a.total);
+      const rankOf = (x) => totals.findIndex(y => y.total === x.total) + 1;
+
+      const teamSide = (name, score, align) => (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: align, gap: 6 }}>
+          <LogoDisc team={name} size={48} />
+          <span style={{ fontSize: 13, color: M.text2, fontWeight: 500 }}>{name}</span>
+          {score !== undefined && <span style={{ fontFamily: OSWALD, fontSize: 30, fontWeight: 600, lineHeight: 1 }}>{score}</span>}
+        </div>
+      );
 
       return (
-        <div style={{ padding: '12px 14px 24px' }}>
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '4px' }}>
-            {[['vote', 'Vote'], ['board', 'Leaderboard']].map(([k, l]) => (
-              <button key={k} onClick={() => setView(k)} style={{ ...chipStyle(view === k), flex: 1, padding: '10px' }}>{l}</button>
-            ))}
-          </div>
+        <div>
+          <LargeTitle title="B&F votes" subtitle={`${S_YEAR} season · ${doneRounds} of ${ratedRounds.length} rounds voted`} onSeason={onSeason} />
+          <Segmented options={[['vote', 'Vote'], ['board', 'Leaderboard']]} value={view} onChange={setView} style={{ marginTop: 16 }} />
 
           {view === 'board' ? (
             totals.length === 0 ? (
-              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '14px', textAlign: 'center', padding: '40px 10px' }}>No votes yet</div>
-            ) : totals.map((x, i) => {
-              const rank = totals.findIndex(y => y.total === x.total) + 1;
-              const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null;
-              return (
-                <div key={x.player.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <span style={{ width: '26px', textAlign: 'center', color: rank <= 3 ? '#fbbf24' : 'rgba(255,255,255,0.4)', fontSize: medal ? '17px' : '14px', fontWeight: '800' }}>{medal || rank}</span>
-                  <PlayerPhoto player={x.player} size={38} />
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'block', color: '#fff', fontSize: '15px', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.player.name}</span>
-                    <span style={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>{x.games} gm • {(x.total / x.games).toFixed(2)} avg</span>
-                  </span>
-                  <span style={{
-                    background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)', color: '#fff',
-                    padding: '6px 13px', borderRadius: '10px', fontSize: '17px', fontWeight: '800',
-                  }}>{x.total}</span>
+              <EmptyState icon="medal" title="No votes yet" text="Votes you give each round add up here." />
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 16, alignItems: 'end' }}>
+                  {[totals[1], totals[0], totals[2]].map((x, i) => x ? (
+                    <Card key={x.player.id} style={{ padding: i === 1 ? '16px 8px 14px' : '12px 8px', textAlign: 'center' }}>
+                      <div style={{ position: 'relative', width: i === 1 ? 62 : 52, margin: '0 auto' }}>
+                        <PlayerPhoto player={x.player} size={i === 1 ? 62 : 52} />
+                        <span style={{
+                          position: 'absolute', right: -4, bottom: -4, width: 22, height: 22, borderRadius: 11,
+                          background: RANK_COLORS[rankOf(x)] || M.fill, color: '#1a1300', fontSize: 12, fontWeight: 800,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #0b1424',
+                        }}>{rankOf(x)}</span>
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 600, marginTop: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{surname(x.player)}</div>
+                      <div style={{ fontFamily: OSWALD, fontSize: i === 1 ? 30 : 24, fontWeight: 600, lineHeight: 1.1, marginTop: 2 }}>{x.total}</div>
+                      <div style={{ color: M.text3, fontSize: 12 }}>{x.games} gm</div>
+                    </Card>
+                  ) : <span key={i}></span>)}
                 </div>
-              );
-            })
+                {totals.length > 3 && (
+                  <Card style={{ marginTop: 12, padding: '2px 14px' }}>
+                    {totals.slice(3).map((x, i) => (
+                      <div key={x.player.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: i ? `1px solid ${M.sep}` : 'none' }}>
+                        <span style={{ width: 22, textAlign: 'center', color: M.text3, fontSize: 15, fontWeight: 600 }}>{rankOf(x)}</span>
+                        <PlayerPhoto player={x.player} size={36} />
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: 'block', fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.player.name}</span>
+                          <span style={{ display: 'block', color: M.text2, fontSize: 13 }}>{x.games} gm · {(x.total / x.games).toFixed(2)} avg</span>
+                        </span>
+                        <span style={{ fontFamily: OSWALD, fontSize: 22, fontWeight: 600 }}>{x.total}</span>
+                      </div>
+                    ))}
+                  </Card>
+                )}
+              </>
+            )
           ) : (
             <>
-              <div style={{
-                position: 'sticky', top: 0, zIndex: 3, margin: '0 -14px', padding: '8px 14px 6px',
-                background: '#08111f', borderBottom: '1px solid rgba(255,255,255,0.06)',
-              }}>
-              <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
-                {arrow(-1)}
-                <select value={round} onChange={(e) => setRound(e.target.value)} style={{
-                  flex: 1, minWidth: 0, padding: '12px', borderRadius: '11px',
-                  background: CARLTON_NAVY, color: '#fff', border: '1px solid rgba(255,255,255,0.15)',
-                  fontSize: '16px', fontWeight: '700', fontFamily: 'Inter, sans-serif',
-                }}>
-                  {playable.map(g => (
-                    <option key={g.round} value={g.round}>{g.round} {g.home ? 'vs' : '@'} {g.opponent}{roundStatus(g.round)}</option>
-                  ))}
-                </select>
-                {arrow(1)}
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', fontSize: '12.5px' }}>
-                {res && (
-                  <span style={{ fontWeight: '800', color: res.result === 'W' ? '#22c55e' : res.result === 'D' ? '#fbbf24' : '#f87171' }}>
-                    {res.result} {res.for}–{res.against}
-                  </span>
-                )}
-                <span style={{ color: 'rgba(255,255,255,0.45)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{game && game.venue}</span>
-                <span style={{ fontWeight: '700', color: target && scored >= target ? '#22c55e' : 'rgba(255,255,255,0.7)' }}>
-                  {scored}{target ? `/${target}` : ''} voted
-                </span>
-              </div>
-              {target && (
-                <div style={{ height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.07)', marginBottom: '10px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${Math.min(100, (scored / target) * 100)}%`, background: scored >= target ? '#22c55e' : '#60a5fa', transition: 'width 0.25s ease' }}></div>
+              <Card style={{ marginTop: 16, padding: '12px 12px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <IconButton icon="chevL" label="Previous round" size={36} disabled={idx <= 0} onClick={() => idx > 0 && setRound(playable[idx - 1].round)} />
+                  <div style={{ position: 'relative', flex: 1, minWidth: 0, textAlign: 'center' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 17, fontWeight: 600 }}>
+                      {roundName(game)} <Icon name="chevD" size={16} width={2.2} />
+                    </div>
+                    <div style={{ color: M.text2, fontSize: 13, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {[game.date, game.venue].filter(Boolean).join(' · ')}
+                    </div>
+                    {/* The native round picker (a wheel on iPhone), invisible over the title */}
+                    <select value={round} onChange={(e) => setRound(e.target.value)} aria-label="Round" style={{
+                      position: 'absolute', inset: 0, width: '100%', opacity: 0, fontSize: 16, cursor: 'pointer',
+                    }}>
+                      {playable.map(g => (
+                        <option key={g.round} value={g.round}>{g.round} {g.home ? 'vs' : '@'} {g.opponent}{roundStatus(g.round)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <IconButton icon="chevR" label="Next round" size={36} disabled={idx >= playable.length - 1} onClick={() => idx < playable.length - 1 && setRound(playable[idx + 1].round)} />
                 </div>
-              )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'rgba(255,255,255,0.35)', fontSize: '10.5px', fontWeight: '600', marginBottom: '4px' }}>
-                {['0 Bad', '1 OK', '2 Good', '3 V.Good', '4 Great'].map(l => <span key={l}>{l}</span>)}
-              </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', marginTop: 16 }}>
+                  {teamSide('Carlton', res ? res.for : undefined, 'center')}
+                  <div style={{ textAlign: 'center', minWidth: 64 }}>
+                    {res ? (
+                      <span style={{
+                        display: 'inline-block', padding: '4px 11px', borderRadius: 999, fontSize: 13, fontWeight: 700,
+                        background: res.result === 'W' ? 'rgba(52,199,89,0.18)' : res.result === 'D' ? 'rgba(255,207,102,0.18)' : 'rgba(255,69,58,0.18)',
+                        color: res.result === 'W' ? '#4cd964' : res.result === 'D' ? M.warn : '#ff6961',
+                      }}>{res.result === 'W' ? 'Won' : res.result === 'D' ? 'Drew' : 'Lost'}</span>
+                    ) : <span style={{ color: M.text3, fontSize: 15, fontWeight: 600 }}>{game.home ? 'vs' : '@'}</span>}
+                  </div>
+                  {teamSide(game.opponent, res ? res.against : undefined, 'center')}
+                </div>
+
+                {target && (
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: M.text2, marginBottom: 6 }}>
+                      <span>{scored >= target ? 'All players voted' : `${scored} of ${target} voted`}</span>
+                      <span>{Math.round((scored / target) * 100)}%</span>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 3, background: M.fill, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${Math.min(100, (scored / target) * 100)}%`, background: scored >= target ? M.green : '#fff', borderRadius: 3, transition: 'width 0.3s ease' }}></div>
+                    </div>
+                  </div>
+                )}
+              </Card>
+
+              <div style={{ color: M.text3, fontSize: 13, textAlign: 'center', margin: '14px 0 4px' }}>
+                0 poor · 1 OK · 2 good · 3 very good · 4 best on ground
               </div>
               {!played.length && (
-                <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '12.5px', padding: '8px 0' }}>
-                  No Wheelo ratings for {round} yet, so everyone's listed.
+                <div style={{ color: M.text2, fontSize: 14, textAlign: 'center', padding: '6px 0' }}>
+                  No Wheelo ratings for {game.round} yet, so everyone's listed.
                 </div>
               )}
 
               {list.map(({ player: p, rating, tog }) => {
                 const score = votes[p.id]?.[round];
                 return (
-                  <div key={p.id} ref={el => { rowRefs.current[p.id] = el; }} style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '9px' }}>
-                      <PlayerPhoto player={p} size={36} />
-                      <span style={{ fontFamily: OSWALD, fontSize: '20px', fontWeight: '600', minWidth: '26px', textAlign: 'center', color: '#fff' }}>{numLabel(p)}</span>
-                      <span style={{ flex: 1, minWidth: 0, color: '#fff', fontSize: '15px', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
-                      {rating !== undefined && (
-                        <span style={{
-                          background: rating >= 15 ? 'rgba(34,197,94,0.22)' : rating >= 8 ? 'rgba(251,191,36,0.22)' : 'rgba(255,255,255,0.08)',
-                          color: rating >= 15 ? '#22c55e' : rating >= 8 ? '#fbbf24' : 'rgba(255,255,255,0.55)',
-                          fontSize: '12px', fontWeight: '800', padding: '3px 7px', borderRadius: '6px',
-                        }}>{rating.toFixed(1)}</span>
-                      )}
-                      {tog ? <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', minWidth: '30px', textAlign: 'right' }}>{Math.round(tog)}%</span> : null}
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
-                      {[0, 1, 2, 3, 4].map(s => (
-                        <button key={s} onClick={() => setScore(p.id, s)} style={{
-                          height: '44px', borderRadius: '10px', cursor: 'pointer',
-                          background: score === s ? scoreColors[s].bg : 'rgba(255,255,255,0.04)',
-                          border: `1px solid ${score === s ? scoreColors[s].border : 'rgba(255,255,255,0.08)'}`,
-                          color: score === s ? scoreColors[s].text : 'rgba(255,255,255,0.4)',
-                          fontSize: '17px', fontWeight: '800',
-                        }}>{s}</button>
-                      ))}
-                    </div>
+                  <div key={p.id} ref={el => { rowRefs.current[p.id] = el; }}>
+                    <Card style={{ marginTop: 10, padding: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <PlayerPhoto player={p} size={40} />
+                        <span style={{ fontFamily: OSWALD, fontSize: 20, fontWeight: 600, minWidth: 24, textAlign: 'center' }}>{numLabel(p)}</span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: 'block', fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                          {rating !== undefined && (
+                            <span style={{ display: 'block', fontSize: 13, color: M.text2 }}>
+                              Rating <span style={{ color: rating >= 15 ? '#4cd964' : rating >= 8 ? M.warn : M.text2, fontWeight: 600 }}>{rating.toFixed(1)}</span>
+                              {tog ? ` · ${Math.round(tog)}% game time` : ''}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 2, padding: 2, marginTop: 10, borderRadius: 11, background: M.fill }}>
+                        {[0, 1, 2, 3, 4].map(s => (
+                          <button key={s} onClick={() => setScore(p.id, s)} aria-label={`${s} votes for ${p.name}`} style={{
+                            flex: 1, height: 40, borderRadius: 9, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                            background: score === s ? VOTE_COLORS[s] : 'transparent',
+                            color: score === s ? '#07101f' : 'rgba(255,255,255,0.7)',
+                            fontSize: 17, fontWeight: score === s ? 700 : 500,
+                            boxShadow: score === s ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
+                            transition: 'background 0.15s ease, color 0.15s ease',
+                          }}>{s}</button>
+                        ))}
+                      </div>
+                    </Card>
                   </div>
                 );
               })}
 
               {played.length > 0 && (
-                <button onClick={() => setShowAll(!showAll)} style={{ ...chipStyle(false), width: '100%', marginTop: '14px', padding: '12px' }}>
+                <MButton onClick={() => setShowAll(!showAll)} style={{ width: '100%', marginTop: 16 }}>
                   {showAll ? 'Hide players who didn’t play' : `Show the other ${others.length} players`}
-                </button>
+                </MButton>
               )}
             </>
           )}
@@ -3885,12 +4074,38 @@
       );
     };
 
+    // ---- App shell ----
+
+    const MenuRow = ({ icon, label, sub, onClick, danger, first }) => (
+      <button onClick={onClick} style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px',
+        background: 'transparent', border: 'none', borderTop: first ? 'none' : `1px solid ${M.sep}`,
+        color: danger ? '#ff6961' : '#fff', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+      }}>
+        <span style={{
+          width: 32, height: 32, borderRadius: 9, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: danger ? 'rgba(255,69,58,0.16)' : 'rgba(255,255,255,0.1)',
+        }}><Icon name={icon} size={18} /></span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 16, fontWeight: 500 }}>{label}</span>
+          {sub && <span style={{ display: 'block', fontSize: 13, color: M.text2, marginTop: 1 }}>{sub}</span>}
+        </span>
+        <span style={{ color: M.text3 }}><Icon name="chevR" size={16} /></span>
+      </button>
+    );
+    const MenuGroup = ({ children }) => (
+      <div style={{ background: M.card, border: `1px solid ${M.sep}`, borderRadius: 14, overflow: 'hidden', marginTop: 14 }}>{children}</div>
+    );
+
     function MobileApp({ onSeason }) {
       const [tab, setTab] = useState(() => { try { return localStorage.getItem('carlton-mobile-tab') || 'team'; } catch { return 'team'; } });
       const [board, setBoard] = useState(() => loadJSON(`carlton-board-${S_YEAR}`));
       const [votes, setVotes] = useState(() => loadJSON(`carlton-bf-${S_YEAR}`));
       const [ratings, setRatings] = useState(loadRatings);
       const [menu, setMenu] = useState(false);
+      const [scrolled, setScrolled] = useState({ team: false, bf: false });
+      const [navTitles, setNavTitles] = useState({ team: 'Best 23', bf: 'B&F votes' });
+      const scrollRefs = useRef({});
       const fileRef = useRef(null);
       const { toast, showToast, runUndo } = useUndoToast();
       const sync = useVoteSync(votes, setVotes);
@@ -3901,91 +4116,83 @@
       useEffect(() => { try { localStorage.setItem(`carlton-bf-${S_YEAR}`, JSON.stringify(votes)); } catch {} }, [votes]);
       useEffect(() => { try { localStorage.setItem(`carlton-wheelo-${S_YEAR}`, JSON.stringify(ratings)); } catch {} }, [ratings]);
 
+      const titleSetter = (k) => (t) => setNavTitles(prev => prev[k] === t ? prev : { ...prev, [k]: t });
+      const onScroll = (k) => (e) => {
+        const s = e.currentTarget.scrollTop > 44;
+        setScrolled(prev => prev[k] === s ? prev : { ...prev, [k]: s });
+      };
+      // Tapping the tab you're already on scrolls it back to the top, as in iPhone apps
+      const pickTab = (k) => {
+        if (k === tab && scrollRefs.current[k]) scrollRefs.current[k].scrollTo({ top: 0, behavior: 'smooth' });
+        setTab(k);
+      };
+      const clearTeam = () => {
+        const before = board;
+        const n = Object.keys(before).length;
+        if (!n) return;
+        setBoard({});
+        showToast(`Team cleared (${n} player${n === 1 ? '' : 's'})`, () => setBoard(before));
+      };
       const copyText = async () => {
         const text = teamText(board);
         try { await navigator.clipboard.writeText(text); showToast('Team copied'); return; } catch {}
         if (navigator.share) { try { await navigator.share({ text }); return; } catch {} }
         window.prompt('Copy your team:', text);
       };
+      const menuDo = (fn) => () => { setMenu(false); setTimeout(fn, 220); };
 
-      const menuItem = (label, sub, fn) => (
-        <button key={label} onClick={() => { setMenu(false); fn(); }} style={{
-          width: '100%', textAlign: 'left', padding: '14px 4px', background: 'transparent', border: 'none',
-          borderBottom: '1px solid rgba(255,255,255,0.06)', color: '#fff', cursor: 'pointer',
-        }}>
-          <span style={{ display: 'block', fontSize: '16px', fontWeight: '700' }}>{label}</span>
-          <span style={{ display: 'block', fontSize: '12.5px', color: 'rgba(255,255,255,0.45)', marginTop: '2px' }}>{sub}</span>
-        </button>
-      );
-
-      const tabs = [
-        ['team', 'Best 23', 'M7 3 3 6l2 4 2-1v11h10V9l2 1 2-4-4-3c-.6 1.5-2.6 2.6-5 2.6S7.6 4.5 7 3z'],
-        ['bf', 'B&F votes', 'M8 2h8l-2.5 6.5h-3zM12 22a6 6 0 1 0 0-12 6 6 0 0 0 0 12z'],
-      ];
+      const isScrolled = scrolled[tab];
+      const tabs = [['team', 'Best 23', 'shirt'], ['bf', 'B&F votes', 'medal']];
+      const bar = { background: M.bar, backdropFilter: M.blur, WebkitBackdropFilter: M.blur };
 
       // The shell is exactly the viewport. Don't make it taller to cover iOS 26's home-screen strip:
       // iPhones then shift the page and taps land above the finger (28 Oct 2026). The strip shows
       // the page's navy base colour (see the HTML) instead.
       return (
-        <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{
-            flexShrink: 0, display: 'flex', alignItems: 'center', gap: '10px',
-            padding: 'calc(env(safe-area-inset-top) + 10px) 14px 10px',
-            background: 'rgba(6,13,26,0.88)', borderBottom: '1px solid rgba(255,255,255,0.07)',
-          }}>
-            <span style={{ color: '#fff', fontWeight: '900', fontSize: '16px', letterSpacing: '3px' }}>CARLTON</span>
-            <span style={{ display: 'inline-flex', gap: '4px' }}>
-              {Object.keys(SEASONS).map(y => (
-                <button key={y} onClick={() => onSeason && onSeason(y)} style={{ ...chipStyle(String(S_YEAR) === y), padding: '6px 11px' }}>{y}</button>
-              ))}
-            </span>
-            <span style={{ flex: 1 }}></span>
-            <button onClick={() => setSyncOpen(true)} aria-label={syncLabel(sync.status)} style={{
-              position: 'relative', width: '40px', height: '40px', borderRadius: '12px', cursor: 'pointer',
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-              color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
-                <path d="M7 18h10.5a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.34 9.1 4.5 4.5 0 0 0 7 18z" />
-              </svg>
-              {sync.status && (
-                <span style={{
-                  position: 'absolute', right: '6px', bottom: '6px', width: '9px', height: '9px', borderRadius: '50%',
-                  background: syncColor(sync.status), border: '2px solid #0b1424',
-                }}></span>
-              )}
-            </button>
-            <button onClick={() => setMenu(true)} aria-label="More" style={{
-              width: '40px', height: '40px', borderRadius: '12px', cursor: 'pointer',
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-              color: '#fff', fontSize: '20px', fontWeight: '800', lineHeight: 1,
-            }}>⋯</button>
-          </div>
-
-          {/* Both tabs stay mounted, each with its own scroll area, so switching keeps your place */}
-          {[['team', <MobileTeam board={board} setBoard={setBoard} votes={votes} showToast={showToast} />],
-            ['bf', <MobileVotes votes={votes} setVotes={setVotes} ratings={ratings} />]].map(([k, el]) => (
-            <div key={k} style={{
-              flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
+        <div style={{ position: 'fixed', inset: 0, fontFamily: M.font, color: '#fff', WebkitFontSmoothing: 'antialiased' }}>
+          {/* Both tabs stay mounted, each with its own scroll area under the translucent bars,
+              so switching keeps your place */}
+          {[['team', <MobileTeam board={board} setBoard={setBoard} votes={votes} showToast={showToast} onSeason={onSeason} setNavTitle={titleSetter('team')} />],
+            ['bf', <MobileVotes votes={votes} setVotes={setVotes} ratings={ratings} onSeason={onSeason} setNavTitle={titleSetter('bf')} />]].map(([k, el]) => (
+            <div key={k} ref={node => { scrollRefs.current[k] = node; }} onScroll={onScroll(k)} style={{
+              position: 'absolute', inset: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
+              padding: `calc(${M.navH} + 4px) 16px calc(${M.tabH} + 28px)`,
               display: tab === k ? 'block' : 'none',
             }}>
               {el}
             </div>
           ))}
 
+          {/* Nav bar: clear at the top, frosted once you scroll; the page title moves up into it */}
           <div style={{
-            flexShrink: 0, display: 'flex',
-            background: 'rgba(6,13,26,0.94)', borderTop: '1px solid rgba(255,255,255,0.08)',
-            paddingBottom: 'env(safe-area-inset-bottom)',
+            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, height: M.navH, paddingTop: 'env(safe-area-inset-top)',
+            display: 'grid', gridTemplateColumns: '92px 1fr 92px', alignItems: 'center', paddingLeft: 12, paddingRight: 12,
+            ...(isScrolled ? bar : { background: 'transparent' }),
+            borderBottom: `0.5px solid ${isScrolled ? M.sep : 'transparent'}`,
+            transition: 'background 0.2s ease, border-color 0.2s ease',
           }}>
-            {tabs.map(([k, label, d]) => (
-              <button key={k} onClick={() => setTab(k)} style={{
-                flex: 1, padding: '9px 0 8px', background: 'transparent', border: 'none', cursor: 'pointer',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
-                color: tab === k ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: '700',
-                borderTop: `2px solid ${tab === k ? '#fff' : 'transparent'}`,
+            <span style={{ display: 'flex', alignItems: 'center' }}><LogoDisc team="Carlton" size={32} /></span>
+            <span style={{
+              textAlign: 'center', fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              opacity: isScrolled ? 1 : 0, transform: isScrolled ? 'none' : 'translateY(4px)', transition: 'opacity 0.2s ease, transform 0.2s ease',
+            }}>{navTitles[tab]}</span>
+            <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <IconButton icon="cloud" label={syncLabel(sync.status)} onClick={() => setSyncOpen(true)} badge={sync.status ? syncColor(sync.status) : null} size={36} />
+              <IconButton icon="more" label="More" onClick={() => setMenu(true)} size={36} />
+            </span>
+          </div>
+
+          <div style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20, display: 'flex',
+            paddingBottom: 'env(safe-area-inset-bottom)', borderTop: `0.5px solid ${M.sep}`, ...bar,
+          }}>
+            {tabs.map(([k, label, icon]) => (
+              <button key={k} onClick={() => pickTab(k)} style={{
+                flex: 1, height: 56, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
+                background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                color: tab === k ? '#fff' : 'rgba(235,241,255,0.45)', fontSize: 10.5, fontWeight: 600,
               }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d={d} /></svg>
+                <Icon name={icon} size={25} width={tab === k ? 2.1 : 1.7} />
                 {label}
               </button>
             ))}
@@ -3993,7 +4200,7 @@
 
           {toast && (
             <div style={{
-              position: 'fixed', left: '12px', right: '12px', bottom: 'calc(env(safe-area-inset-bottom) + 74px)', zIndex: 3500,
+              position: 'fixed', left: 12, right: 12, bottom: `calc(${M.tabH} + 12px)`, zIndex: 3500,
               display: 'flex', justifyContent: 'center', pointerEvents: 'none',
             }}>
               <ToastPill toast={toast} onUndo={runUndo} />
@@ -4002,15 +4209,25 @@
 
           {menu && (
             <Sheet title="More" onClose={() => setMenu(false)}>
-              {menuItem('Sync votes', sync.status ? `${syncLabel(sync.status)} • last ${ago(sync.status.last)}` : 'Keep votes the same on your phone and computer', () => setSyncOpen(true))}
-              {menuItem('Share team sheet', 'Image of your best 23 for messages or socials', () => saveTeamSheet(board, true))}
-              {menuItem('Copy team as text', 'B: … HB: … for pasting into a chat', copyText)}
-              {menuItem('Back up', 'Download all votes and teams (every season) as a file', () => downloadBackup({ votes, ratings, board }))}
-              {menuItem('Restore from backup', 'Load a backup file, e.g. one made on your computer', () => fileRef.current && fileRef.current.click())}
-              {menuItem('Desktop view', 'The full magnet board, stats, H2H and fixture', () => {
-                try { localStorage.setItem('carlton-view', 'desktop'); } catch {}
-                location.reload();
-              })}
+              <MenuGroup>
+                <MenuRow first icon="cloud" label="Sync votes" onClick={menuDo(() => setSyncOpen(true))}
+                  sub={sync.status ? `${syncLabel(sync.status)} · ${ago(sync.status.last)}` : 'Same votes on your phone and computer'} />
+              </MenuGroup>
+              <MenuGroup>
+                <MenuRow first icon="share" label="Share team sheet" sub="Image of your best 23" onClick={menuDo(() => saveTeamSheet(board, true))} />
+                <MenuRow icon="copy" label="Copy team as text" sub="For pasting into a chat" onClick={menuDo(copyText)} />
+              </MenuGroup>
+              <MenuGroup>
+                <MenuRow first icon="download" label="Back up" sub="All votes and teams, every season" onClick={menuDo(() => downloadBackup({ votes, ratings, board }))} />
+                <MenuRow icon="upload" label="Restore from backup" sub="Load a backup file" onClick={menuDo(() => fileRef.current && fileRef.current.click())} />
+                <MenuRow icon="desktop" label="Desktop view" sub="Magnet board, stats, H2H and fixture" onClick={menuDo(() => {
+                  try { localStorage.setItem('carlton-view', 'desktop'); } catch {}
+                  location.reload();
+                })} />
+              </MenuGroup>
+              <MenuGroup>
+                <MenuRow first danger icon="trash" label="Clear team" sub="You can undo straight after" onClick={menuDo(clearTeam)} />
+              </MenuGroup>
             </Sheet>
           )}
           {syncOpen && (
