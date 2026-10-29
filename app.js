@@ -5616,6 +5616,7 @@ const Sheet = ({
   const panelMax = Math.max(240, view.height - 44);
   const close = () => {
     if (closing) return;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     setClosing(true);
     setTimeout(onClose, 200);
   };
@@ -6486,11 +6487,17 @@ const MobileVotes = ({
     if (off) return;
     const at = list.findIndex(x => x.player.id === pid);
     const next = list.slice(at + 1).find(x => votes[x.player.id]?.[round] === undefined || votes[x.player.id]?.[round] === null);
+    // Scroll the tab's own list only. scrollIntoView also nudges the page on iPhones,
+    // which leaves every later tap landing above the finger.
     if (next) setTimeout(() => {
       const el = rowRefs.current[next.player.id];
-      if (el && el.scrollIntoView) el.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
+      const sc = el && el.closest('[data-scroller]');
+      if (!sc) return;
+      const r = el.getBoundingClientRect(),
+        sr = sc.getBoundingClientRect();
+      sc.scrollTo({
+        top: sc.scrollTop + (r.top - sr.top) - (sc.clientHeight - r.height) / 2,
+        behavior: 'smooth'
       });
     }, 140);
   };
@@ -6710,7 +6717,11 @@ const MobileVotes = ({
     }
   }, [game.date, game.venue].filter(Boolean).join(' · ')), /*#__PURE__*/React.createElement("select", {
     value: round,
-    onChange: e => setRound(e.target.value),
+    onChange: e => {
+      setRound(e.target.value);
+      e.target.blur();
+    },
+    onBlur: unshiftAfterKeyboard,
     "aria-label": "Round",
     style: {
       position: 'absolute',
@@ -7004,6 +7015,38 @@ function MobileApp({
       localStorage.setItem('carlton-mobile-tab', tab);
     } catch {}
   }, [tab]);
+  // iPhones shift the page to show a focused field or the round wheel and don't always shift
+  // it back. Everything here scrolls inside its own panel, so any page offset left behind only
+  // misaligns taps: undo it once no field is focused.
+  useEffect(() => {
+    const fieldFocused = () => {
+      const el = document.activeElement;
+      return !!el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+    };
+    const reset = () => {
+      if (fieldFocused()) return;
+      const off = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || (window.visualViewport ? Math.round(window.visualViewport.offsetTop) : 0);
+      if (off) {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }
+    };
+    const later = () => setTimeout(reset, 80);
+    const vv = window.visualViewport;
+    window.addEventListener('scroll', later, {
+      passive: true
+    });
+    document.addEventListener('focusout', later);
+    document.addEventListener('visibilitychange', later);
+    if (vv) vv.addEventListener('resize', later);
+    return () => {
+      window.removeEventListener('scroll', later);
+      document.removeEventListener('focusout', later);
+      document.removeEventListener('visibilitychange', later);
+      if (vv) vv.removeEventListener('resize', later);
+    };
+  }, []);
   useEffect(() => {
     try {
       localStorage.setItem(`carlton-board-${S_YEAR}`, JSON.stringify(board));
@@ -7100,6 +7143,7 @@ function MobileApp({
     setNavTitle: titleSetter('bf')
   })]].map(([k, el]) => /*#__PURE__*/React.createElement("div", {
     key: k,
+    "data-scroller": "",
     ref: node => {
       scrollRefs.current[k] = node;
     },

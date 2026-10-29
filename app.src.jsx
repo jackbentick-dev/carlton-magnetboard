@@ -3471,6 +3471,7 @@
 
       const close = () => {
         if (closing) return;
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
         setClosing(true);
         setTimeout(onClose, 200);
       };
@@ -3900,9 +3901,14 @@
         if (off) return;
         const at = list.findIndex(x => x.player.id === pid);
         const next = list.slice(at + 1).find(x => votes[x.player.id]?.[round] === undefined || votes[x.player.id]?.[round] === null);
+        // Scroll the tab's own list only. scrollIntoView also nudges the page on iPhones,
+        // which leaves every later tap landing above the finger.
         if (next) setTimeout(() => {
           const el = rowRefs.current[next.player.id];
-          if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const sc = el && el.closest('[data-scroller]');
+          if (!sc) return;
+          const r = el.getBoundingClientRect(), sr = sc.getBoundingClientRect();
+          sc.scrollTo({ top: sc.scrollTop + (r.top - sr.top) - (sc.clientHeight - r.height) / 2, behavior: 'smooth' });
         }, 140);
       };
       const roundStatus = (r) => {
@@ -3981,7 +3987,7 @@
                       {[game.date, game.venue].filter(Boolean).join(' · ')}
                     </div>
                     {/* The native round picker (a wheel on iPhone), invisible over the title */}
-                    <select value={round} onChange={(e) => setRound(e.target.value)} aria-label="Round" style={{
+                    <select value={round} onChange={(e) => { setRound(e.target.value); e.target.blur(); }} onBlur={unshiftAfterKeyboard} aria-label="Round" style={{
                       position: 'absolute', inset: 0, width: '100%', opacity: 0, fontSize: 16, cursor: 'pointer',
                     }}>
                       {playable.map(g => (
@@ -4112,6 +4118,30 @@
       const [syncOpen, setSyncOpen] = useState(false);
 
       useEffect(() => { try { localStorage.setItem('carlton-mobile-tab', tab); } catch {} }, [tab]);
+      // iPhones shift the page to show a focused field or the round wheel and don't always shift
+      // it back. Everything here scrolls inside its own panel, so any page offset left behind only
+      // misaligns taps: undo it once no field is focused.
+      useEffect(() => {
+        const fieldFocused = () => { const el = document.activeElement; return !!el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName); };
+        const reset = () => {
+          if (fieldFocused()) return;
+          const off = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop
+            || (window.visualViewport ? Math.round(window.visualViewport.offsetTop) : 0);
+          if (off) { window.scrollTo(0, 0); document.documentElement.scrollTop = 0; document.body.scrollTop = 0; }
+        };
+        const later = () => setTimeout(reset, 80);
+        const vv = window.visualViewport;
+        window.addEventListener('scroll', later, { passive: true });
+        document.addEventListener('focusout', later);
+        document.addEventListener('visibilitychange', later);
+        if (vv) vv.addEventListener('resize', later);
+        return () => {
+          window.removeEventListener('scroll', later);
+          document.removeEventListener('focusout', later);
+          document.removeEventListener('visibilitychange', later);
+          if (vv) vv.removeEventListener('resize', later);
+        };
+      }, []);
       useEffect(() => { try { localStorage.setItem(`carlton-board-${S_YEAR}`, JSON.stringify(board)); } catch {} }, [board]);
       useEffect(() => { try { localStorage.setItem(`carlton-bf-${S_YEAR}`, JSON.stringify(votes)); } catch {} }, [votes]);
       useEffect(() => { try { localStorage.setItem(`carlton-wheelo-${S_YEAR}`, JSON.stringify(ratings)); } catch {} }, [ratings]);
@@ -4154,7 +4184,7 @@
               so switching keeps your place */}
           {[['team', <MobileTeam board={board} setBoard={setBoard} votes={votes} showToast={showToast} onSeason={onSeason} setNavTitle={titleSetter('team')} />],
             ['bf', <MobileVotes votes={votes} setVotes={setVotes} ratings={ratings} onSeason={onSeason} setNavTitle={titleSetter('bf')} />]].map(([k, el]) => (
-            <div key={k} ref={node => { scrollRefs.current[k] = node; }} onScroll={onScroll(k)} style={{
+            <div key={k} data-scroller="" ref={node => { scrollRefs.current[k] = node; }} onScroll={onScroll(k)} style={{
               position: 'absolute', inset: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
               padding: `calc(${M.navH} + 4px) 16px calc(${M.tabH} + 28px)`,
               display: tab === k ? 'block' : 'none',

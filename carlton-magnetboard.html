@@ -22,6 +22,7 @@
       if (!window.CARLTON_MOBILE && Math.min(screen.width, screen.height) < 1100) {
         document.querySelector('meta[name=viewport]').setAttribute('content', 'width=1440');
       }
+      if (window.CARLTON_MOBILE) document.documentElement.classList.add('m-app');
     })();
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
@@ -76,6 +77,10 @@
     .magnet-enter { animation: magnet-settle 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); }
     html { -webkit-text-size-adjust: 100%; touch-action: manipulation; }
     html, body { overscroll-behavior: none; }
+    /* Phone layout: the page itself never scrolls (every panel scrolls inside itself). Pinning the
+       body stops iPhones shifting the page, which made taps land above the finger. */
+    html.m-app { height: 100%; overflow: hidden; }
+    html.m-app body { position: fixed; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; }
     /* Holding a tile or button shouldn't start text selection or the iPhone callout menu */
     button { font-family: 'Inter', sans-serif; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
       -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
