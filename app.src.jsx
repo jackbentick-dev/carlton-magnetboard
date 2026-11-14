@@ -2514,8 +2514,46 @@
         };
       }, []);
 
+      // "This device has the right votes": make the on-screen season's synced copy exactly this
+      // device's votes. Every vote here is stamped now, and any vote only the gist has is cleared
+      // (also stamped now), so other devices take these over whatever they hold.
+      const claim = async () => {
+        const cfg = loadSync();
+        if (!cfg) return;
+        if (busy.current) { setTimeout(claim, 400); return; }
+        busy.current = true;
+        clearTimeout(timer.current);
+        setStatus(s => ({ ...(s || {}), state: 'syncing' }));
+        try {
+          const y = String(S_YEAR);
+          const gist = await ghFetch(cfg.token, `/gists/${cfg.gistId}`);
+          let remote = {};
+          try { remote = JSON.parse(gist.files[SYNC_FILE].content).seasons || {}; } catch {}
+          // Keep a copy of what the gist held, in case this was pressed on the wrong device
+          try { localStorage.setItem(`carlton-bf-replaced-${y}`, JSON.stringify({ at: Date.now(), cells: remote[y] || {} })); } catch {}
+          // Newer than anything already synced, even if another device's clock runs ahead
+          const now = Math.max(Date.now(), ...Object.values(remote[y] || {}).map(c => (c[1] || 0) + 1));
+          const cells = {};
+          voteKeys(live.current).forEach(k => { const v = cellVal(live.current, k); if (v !== null) cells[k] = [v, now]; });
+          [...Object.keys(remote[y] || {}), ...Object.keys(stamps.current)].forEach(k => { if (!cells[k]) cells[k] = [null, now]; });
+          await ghFetch(cfg.token, `/gists/${cfg.gistId}`, { method: 'PATCH', body: {
+            files: { [SYNC_FILE]: { content: JSON.stringify({ app: 'carlton-magnetboard', version: 1, updated: new Date().toISOString(), seasons: { ...remote, [y]: cells } }) } },
+          } });
+          stamps.current = fromCells(cells).stamps;
+          try { localStorage.setItem(stampsKey(y), JSON.stringify(stamps.current)); } catch {}
+          saveSync({ ...loadSync(), last: now });
+          setStatus({ state: 'ok', last: now });
+        } catch (e) {
+          const msg = e && e.message === 'Failed to fetch' ? 'Couldn’t reach GitHub (offline?)' : (e && e.message) || 'Sync failed';
+          setStatus({ state: 'error', msg, last: (loadSync() || {}).last });
+        }
+        busy.current = false;
+        // Pull the other seasons as usual
+        runRef.current();
+      };
+
       const refresh = () => { const c = loadSync(); setStatus(c ? { state: 'idle', last: c.last } : null); };
-      return { status, syncNow: () => runRef.current(), refresh };
+      return { status, syncNow: () => runRef.current(), claim, refresh };
     };
 
     const ago = (ms) => {
@@ -2531,6 +2569,7 @@
 
     // Connect / status / disconnect. Shared by the desktop modal and the phone sheet.
     const SyncPanel = ({ sync }) => {
+      const CLAIM_ASK = `Does this device have the right ${S_YEAR} votes?\n\nOK: your other devices change to match this one exactly (any ${S_YEAR} votes only they have are removed).\nCancel: combine the votes instead, keeping the newest of each.`;
       const cfg = loadSync();
       const [token, setToken] = useState('');
       const [busy, setBusy] = useState(false);
@@ -2550,7 +2589,7 @@
           await connectSync(token);
           setToken('');
           sync.refresh();
-          sync.syncNow();
+          if (confirm(CLAIM_ASK)) sync.claim(); else sync.syncNow();
         } catch (e) {
           setErr(e && e.message === 'Failed to fetch' ? 'Couldn’t reach GitHub. Check your connection.' : (e && e.message) || 'Couldn’t connect');
         }
@@ -2578,6 +2617,11 @@
                 saveSync(null); sync.refresh();
               }} style={btn(false)}>Disconnect</button>
             </div>
+            <button onClick={() => { if (confirm(CLAIM_ASK)) sync.claim(); }}
+              disabled={st && st.state === 'syncing'}
+              style={{ ...btn(false), width: '100%', marginTop: '8px', opacity: st && st.state === 'syncing' ? 0.5 : 1 }}>
+              Send this device’s {S_YEAR} votes to all devices
+            </button>
             <div style={{ ...para, fontSize: '12px', marginTop: '12px', marginBottom: 0, color: 'rgba(255,255,255,0.4)' }}>
               The votes live in a private gist on your GitHub account (gist.github.com).
             </div>
