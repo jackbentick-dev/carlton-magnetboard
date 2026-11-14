@@ -3880,6 +3880,17 @@ const mergeCells = (a, b, strict) => {
   return out;
 };
 
+// After "Send this device's votes to all devices" the gist records when (`resets[year]`).
+// Anything a device changed before then is out of date, including votes only it has.
+const dropBefore = (cells, t) => {
+  if (!t) return cells;
+  const out = {};
+  Object.entries(cells).forEach(([k, c]) => {
+    if (c[1] >= t) out[k] = c;
+  });
+  return out;
+};
+
 // Reuse the gist another device made (same GitHub account), or make one. Returns the login.
 const connectSync = async rawToken => {
   const token = rawToken.trim();
@@ -3910,7 +3921,17 @@ const connectSync = async rawToken => {
     login: user.login,
     last: 0
   });
-  return user.login;
+  // Does another device already have votes for the season on screen?
+  let hasVotes = false;
+  try {
+    const full = gist.files[SYNC_FILE].content ? gist : await ghFetch(token, `/gists/${gist.id}`);
+    const cells = (JSON.parse(full.files[SYNC_FILE].content).seasons || {})[String(S_YEAR)] || {};
+    hasVotes = Object.values(cells).some(c => c[0] !== null);
+  } catch {}
+  return {
+    login: user.login,
+    hasVotes
+  };
 };
 
 // Pull, merge, push if anything's new. `cur` is the on-screen season's live { votes, stamps };
@@ -3920,9 +3941,12 @@ const syncVotes = async cur => {
   const cfg = loadSync();
   if (!cfg) return null;
   const gist = await ghFetch(cfg.token, `/gists/${cfg.gistId}`);
-  let remote = {};
+  let remote = {},
+    resets = {};
   try {
-    remote = JSON.parse(gist.files[SYNC_FILE].content).seasons || {};
+    const doc = JSON.parse(gist.files[SYNC_FILE].content);
+    remote = doc.seasons || {};
+    resets = doc.resets || {};
   } catch {}
   const seasons = {
     ...remote
@@ -3931,7 +3955,7 @@ const syncVotes = async cur => {
     curCells = null;
   Object.keys(SEASONS).forEach(y => {
     const here = String(S_YEAR) === y;
-    const local = here ? toCells(cur.votes, cur.stamps) : toCells(loadJSON(`carlton-bf-${y}`), loadJSON(stampsKey(y)));
+    const local = dropBefore(here ? toCells(cur.votes, cur.stamps) : toCells(loadJSON(`carlton-bf-${y}`), loadJSON(stampsKey(y))), resets[y]);
     const merged = mergeCells(local, remote[y]);
     if (stableJSON(merged) !== stableJSON(remote[y] || {})) dirty = true;
     seasons[y] = merged;
@@ -3958,7 +3982,8 @@ const syncVotes = async cur => {
               app: 'carlton-magnetboard',
               version: 1,
               updated: new Date().toISOString(),
-              seasons
+              seasons,
+              resets
             })
           }
         }
@@ -3969,7 +3994,10 @@ const syncVotes = async cur => {
     ...loadSync(),
     last: Date.now()
   });
-  return curCells;
+  return {
+    cells: curCells,
+    reset: resets[String(S_YEAR)]
+  };
 };
 
 // Stamps this device's vote changes, pushes ~1.5s after them, and pulls on open/foreground
@@ -4004,7 +4032,10 @@ const useVoteSync = (votes, setVotes) => {
       state: 'syncing'
     }));
     try {
-      const merged = await syncVotes({
+      const {
+        cells: merged,
+        reset
+      } = await syncVotes({
         votes: live.current,
         stamps: stamps.current
       });
@@ -4012,7 +4043,7 @@ const useVoteSync = (votes, setVotes) => {
       const {
         votes: nv,
         stamps: ns
-      } = fromCells(mergeCells(merged, toCells(live.current, stamps.current), true));
+      } = fromCells(mergeCells(merged, dropBefore(toCells(live.current, stamps.current), reset), true));
       stamps.current = ns;
       try {
         localStorage.setItem(stampsKey(S_YEAR), JSON.stringify(ns));
@@ -4097,9 +4128,12 @@ const useVoteSync = (votes, setVotes) => {
     try {
       const y = String(S_YEAR);
       const gist = await ghFetch(cfg.token, `/gists/${cfg.gistId}`);
-      let remote = {};
+      let remote = {},
+        resets = {};
       try {
-        remote = JSON.parse(gist.files[SYNC_FILE].content).seasons || {};
+        const doc = JSON.parse(gist.files[SYNC_FILE].content);
+        remote = doc.seasons || {};
+        resets = doc.resets || {};
       } catch {}
       // Keep a copy of what the gist held, in case this was pressed on the wrong device
       try {
@@ -4130,6 +4164,10 @@ const useVoteSync = (votes, setVotes) => {
                 seasons: {
                   ...remote,
                   [y]: cells
+                },
+                resets: {
+                  ...resets,
+                  [y]: now
                 }
               })
             }
@@ -4160,6 +4198,53 @@ const useVoteSync = (votes, setVotes) => {
     // Pull the other seasons as usual
     runRef.current();
   };
+
+  // The opposite: make this device's on-screen season exactly what's synced. Recording a reset
+  // time of now makes the next sync drop everything this device changed before it.
+  const take = async () => {
+    const cfg = loadSync();
+    if (!cfg) return;
+    if (busy.current) {
+      setTimeout(take, 400);
+      return;
+    }
+    busy.current = true;
+    setStatus(s => ({
+      ...(s || {}),
+      state: 'syncing'
+    }));
+    try {
+      const y = String(S_YEAR);
+      const gist = await ghFetch(cfg.token, `/gists/${cfg.gistId}`);
+      const doc = JSON.parse(gist.files[SYNC_FILE].content);
+      doc.resets = {
+        ...(doc.resets || {}),
+        [y]: Math.max(Date.now(), (doc.resets || {})[y] || 0)
+      };
+      doc.updated = new Date().toISOString();
+      await ghFetch(cfg.token, `/gists/${cfg.gistId}`, {
+        method: 'PATCH',
+        body: {
+          files: {
+            [SYNC_FILE]: {
+              content: JSON.stringify(doc)
+            }
+          }
+        }
+      });
+    } catch (e) {
+      const msg = e && e.message === 'Failed to fetch' ? 'Couldn’t reach GitHub (offline?)' : e && e.message || 'Sync failed';
+      setStatus({
+        state: 'error',
+        msg,
+        last: (loadSync() || {}).last
+      });
+      busy.current = false;
+      return;
+    }
+    busy.current = false;
+    runRef.current();
+  };
   const refresh = () => {
     const c = loadSync();
     setStatus(c ? {
@@ -4171,6 +4256,7 @@ const useVoteSync = (votes, setVotes) => {
     status,
     syncNow: () => runRef.current(),
     claim,
+    take,
     refresh
   };
 };
@@ -4197,6 +4283,7 @@ const SyncPanel = ({
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [copied, setCopied] = useState('');
   const st = sync.status;
   const para = {
     color: 'rgba(255,255,255,0.65)',
@@ -4219,10 +4306,12 @@ const SyncPanel = ({
     setBusy(true);
     setErr('');
     try {
-      await connectSync(token);
+      const {
+        hasVotes
+      } = await connectSync(token);
       setToken('');
       sync.refresh();
-      if (confirm(CLAIM_ASK)) sync.claim();else sync.syncNow();
+      if (hasVotes && confirm(`Your other device has already synced ${S_YEAR} votes.\n\nOK: make this device match it exactly.\nCancel: combine both devices' votes instead.`)) sync.take();else sync.syncNow();
     } catch (e) {
       setErr(e && e.message === 'Failed to fetch' ? 'Couldn’t reach GitHub. Check your connection.' : e && e.message || 'Couldn’t connect');
     }
@@ -4285,7 +4374,59 @@ const SyncPanel = ({
         marginTop: '8px',
         opacity: st && st.state === 'syncing' ? 0.5 : 1
       }
-    }, "Send this device\u2019s ", S_YEAR, " votes to all devices"), /*#__PURE__*/React.createElement("div", {
+    }, "Send this device\u2019s ", S_YEAR, " votes to all devices"), !CARLTON_MOBILE && /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: '14px',
+        paddingTop: '14px',
+        borderTop: '1px solid rgba(255,255,255,0.1)'
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: '#fff',
+        fontSize: '13.5px',
+        fontWeight: '700',
+        marginBottom: '6px'
+      }
+    }, "Connect your phone"), /*#__PURE__*/React.createElement("div", {
+      style: para
+    }, "Copy the sync key here, then on your phone tap the cloud button and paste it in. iPhones can paste what a Mac copied when both use the same Apple Account."), /*#__PURE__*/React.createElement("button", {
+      onClick: async () => {
+        let ok = false;
+        try {
+          await navigator.clipboard.writeText(cfg.token);
+          ok = true;
+        } catch {}
+        setCopied(ok ? 'copied' : 'show');
+      },
+      style: {
+        ...btn(true),
+        width: '100%'
+      }
+    }, copied === 'copied' ? 'Copied: now paste it on your phone' : 'Copy sync key'), copied === 'show' && /*#__PURE__*/React.createElement("input", {
+      readOnly: true,
+      value: cfg.token,
+      onFocus: e => e.target.select(),
+      autoFocus: true,
+      style: {
+        width: '100%',
+        marginTop: '8px',
+        padding: '10px 12px',
+        borderRadius: '10px',
+        background: 'rgba(255,255,255,0.06)',
+        border: '1px solid rgba(255,255,255,0.14)',
+        color: '#fff',
+        fontSize: '13px',
+        fontFamily: 'monospace'
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        ...para,
+        fontSize: '12px',
+        marginTop: '8px',
+        marginBottom: 0,
+        color: 'rgba(255,255,255,0.4)'
+      }
+    }, "Treat the key like a password: it can read and change your gists.")), /*#__PURE__*/React.createElement("div", {
       style: {
         ...para,
         fontSize: '12px',
@@ -4298,6 +4439,15 @@ const SyncPanel = ({
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: para
   }, "Keep B&F votes the same on your phone and computer. They're stored in a private gist on your GitHub account, and each device needs a GitHub token that can only read and write gists."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...para,
+      color: '#fff',
+      background: 'rgba(96,165,250,0.12)',
+      border: '1px solid rgba(96,165,250,0.3)',
+      borderRadius: '10px',
+      padding: '10px 12px'
+    }
+  }, "Already syncing on your computer? Click \u201CCopy sync key\u201D in its sync window, then paste it in step 2 below and skip step 1."), /*#__PURE__*/React.createElement("div", {
     style: {
       color: '#fff',
       fontSize: '13.5px',

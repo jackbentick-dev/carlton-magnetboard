@@ -2405,6 +2405,15 @@
       return out;
     };
 
+    // After "Send this device's votes to all devices" the gist records when (`resets[year]`).
+    // Anything a device changed before then is out of date, including votes only it has.
+    const dropBefore = (cells, t) => {
+      if (!t) return cells;
+      const out = {};
+      Object.entries(cells).forEach(([k, c]) => { if (c[1] >= t) out[k] = c; });
+      return out;
+    };
+
     // Reuse the gist another device made (same GitHub account), or make one. Returns the login.
     const connectSync = async (rawToken) => {
       const token = rawToken.trim();
@@ -2418,7 +2427,14 @@
         } });
       }
       saveSync({ token, gistId: gist.id, login: user.login, last: 0 });
-      return user.login;
+      // Does another device already have votes for the season on screen?
+      let hasVotes = false;
+      try {
+        const full = gist.files[SYNC_FILE].content ? gist : await ghFetch(token, `/gists/${gist.id}`);
+        const cells = (JSON.parse(full.files[SYNC_FILE].content).seasons || {})[String(S_YEAR)] || {};
+        hasVotes = Object.values(cells).some(c => c[0] !== null);
+      } catch {}
+      return { login: user.login, hasVotes };
     };
 
     // Pull, merge, push if anything's new. `cur` is the on-screen season's live { votes, stamps };
@@ -2428,13 +2444,17 @@
       const cfg = loadSync();
       if (!cfg) return null;
       const gist = await ghFetch(cfg.token, `/gists/${cfg.gistId}`);
-      let remote = {};
-      try { remote = JSON.parse(gist.files[SYNC_FILE].content).seasons || {}; } catch {}
+      let remote = {}, resets = {};
+      try {
+        const doc = JSON.parse(gist.files[SYNC_FILE].content);
+        remote = doc.seasons || {};
+        resets = doc.resets || {};
+      } catch {}
       const seasons = { ...remote };
       let dirty = false, curCells = null;
       Object.keys(SEASONS).forEach(y => {
         const here = String(S_YEAR) === y;
-        const local = here ? toCells(cur.votes, cur.stamps) : toCells(loadJSON(`carlton-bf-${y}`), loadJSON(stampsKey(y)));
+        const local = dropBefore(here ? toCells(cur.votes, cur.stamps) : toCells(loadJSON(`carlton-bf-${y}`), loadJSON(stampsKey(y))), resets[y]);
         const merged = mergeCells(local, remote[y]);
         if (stableJSON(merged) !== stableJSON(remote[y] || {})) dirty = true;
         seasons[y] = merged;
@@ -2447,11 +2467,11 @@
       });
       if (dirty) {
         await ghFetch(cfg.token, `/gists/${cfg.gistId}`, { method: 'PATCH', body: {
-          files: { [SYNC_FILE]: { content: JSON.stringify({ app: 'carlton-magnetboard', version: 1, updated: new Date().toISOString(), seasons }) } },
+          files: { [SYNC_FILE]: { content: JSON.stringify({ app: 'carlton-magnetboard', version: 1, updated: new Date().toISOString(), seasons, resets }) } },
         } });
       }
       saveSync({ ...loadSync(), last: Date.now() });
-      return curCells;
+      return { cells: curCells, reset: resets[String(S_YEAR)] };
     };
 
     // Stamps this device's vote changes, pushes ~1.5s after them, and pulls on open/foreground
@@ -2470,9 +2490,9 @@
         busy.current = true;
         setStatus(s => ({ ...(s || {}), state: 'syncing' }));
         try {
-          const merged = await syncVotes({ votes: live.current, stamps: stamps.current });
+          const { cells: merged, reset } = await syncVotes({ votes: live.current, stamps: stamps.current });
           // Votes made while that request was out are newer than anything it brought back
-          const { votes: nv, stamps: ns } = fromCells(mergeCells(merged, toCells(live.current, stamps.current), true));
+          const { votes: nv, stamps: ns } = fromCells(mergeCells(merged, dropBefore(toCells(live.current, stamps.current), reset), true));
           stamps.current = ns;
           try { localStorage.setItem(stampsKey(S_YEAR), JSON.stringify(ns)); } catch {}
           if (stableJSON(nv) !== stableJSON(fromCells(toCells(live.current, {})).votes)) { fromSync.current = true; setVotes(nv); }
@@ -2527,8 +2547,12 @@
         try {
           const y = String(S_YEAR);
           const gist = await ghFetch(cfg.token, `/gists/${cfg.gistId}`);
-          let remote = {};
-          try { remote = JSON.parse(gist.files[SYNC_FILE].content).seasons || {}; } catch {}
+          let remote = {}, resets = {};
+          try {
+            const doc = JSON.parse(gist.files[SYNC_FILE].content);
+            remote = doc.seasons || {};
+            resets = doc.resets || {};
+          } catch {}
           // Keep a copy of what the gist held, in case this was pressed on the wrong device
           try { localStorage.setItem(`carlton-bf-replaced-${y}`, JSON.stringify({ at: Date.now(), cells: remote[y] || {} })); } catch {}
           // Newer than anything already synced, even if another device's clock runs ahead
@@ -2537,7 +2561,7 @@
           voteKeys(live.current).forEach(k => { const v = cellVal(live.current, k); if (v !== null) cells[k] = [v, now]; });
           [...Object.keys(remote[y] || {}), ...Object.keys(stamps.current)].forEach(k => { if (!cells[k]) cells[k] = [null, now]; });
           await ghFetch(cfg.token, `/gists/${cfg.gistId}`, { method: 'PATCH', body: {
-            files: { [SYNC_FILE]: { content: JSON.stringify({ app: 'carlton-magnetboard', version: 1, updated: new Date().toISOString(), seasons: { ...remote, [y]: cells } }) } },
+            files: { [SYNC_FILE]: { content: JSON.stringify({ app: 'carlton-magnetboard', version: 1, updated: new Date().toISOString(), seasons: { ...remote, [y]: cells }, resets: { ...resets, [y]: now } }) } },
           } });
           stamps.current = fromCells(cells).stamps;
           try { localStorage.setItem(stampsKey(y), JSON.stringify(stamps.current)); } catch {}
@@ -2552,8 +2576,33 @@
         runRef.current();
       };
 
+      // The opposite: make this device's on-screen season exactly what's synced. Recording a reset
+      // time of now makes the next sync drop everything this device changed before it.
+      const take = async () => {
+        const cfg = loadSync();
+        if (!cfg) return;
+        if (busy.current) { setTimeout(take, 400); return; }
+        busy.current = true;
+        setStatus(s => ({ ...(s || {}), state: 'syncing' }));
+        try {
+          const y = String(S_YEAR);
+          const gist = await ghFetch(cfg.token, `/gists/${cfg.gistId}`);
+          const doc = JSON.parse(gist.files[SYNC_FILE].content);
+          doc.resets = { ...(doc.resets || {}), [y]: Math.max(Date.now(), (doc.resets || {})[y] || 0) };
+          doc.updated = new Date().toISOString();
+          await ghFetch(cfg.token, `/gists/${cfg.gistId}`, { method: 'PATCH', body: { files: { [SYNC_FILE]: { content: JSON.stringify(doc) } } } });
+        } catch (e) {
+          const msg = e && e.message === 'Failed to fetch' ? 'Couldn’t reach GitHub (offline?)' : (e && e.message) || 'Sync failed';
+          setStatus({ state: 'error', msg, last: (loadSync() || {}).last });
+          busy.current = false;
+          return;
+        }
+        busy.current = false;
+        runRef.current();
+      };
+
       const refresh = () => { const c = loadSync(); setStatus(c ? { state: 'idle', last: c.last } : null); };
-      return { status, syncNow: () => runRef.current(), claim, refresh };
+      return { status, syncNow: () => runRef.current(), claim, take, refresh };
     };
 
     const ago = (ms) => {
@@ -2574,6 +2623,7 @@
       const [token, setToken] = useState('');
       const [busy, setBusy] = useState(false);
       const [err, setErr] = useState('');
+      const [copied, setCopied] = useState('');
       const st = sync.status;
       const para = { color: 'rgba(255,255,255,0.65)', fontSize: '13.5px', lineHeight: 1.5, marginBottom: '12px' };
       const btn = (primary) => ({
@@ -2586,10 +2636,11 @@
         if (!token.trim()) return;
         setBusy(true); setErr('');
         try {
-          await connectSync(token);
+          const { hasVotes } = await connectSync(token);
           setToken('');
           sync.refresh();
-          if (confirm(CLAIM_ASK)) sync.claim(); else sync.syncNow();
+          if (hasVotes && confirm(`Your other device has already synced ${S_YEAR} votes.\n\nOK: make this device match it exactly.\nCancel: combine both devices' votes instead.`)) sync.take();
+          else sync.syncNow();
         } catch (e) {
           setErr(e && e.message === 'Failed to fetch' ? 'Couldn’t reach GitHub. Check your connection.' : (e && e.message) || 'Couldn’t connect');
         }
@@ -2622,6 +2673,30 @@
               style={{ ...btn(false), width: '100%', marginTop: '8px', opacity: st && st.state === 'syncing' ? 0.5 : 1 }}>
               Send this device’s {S_YEAR} votes to all devices
             </button>
+            {!CARLTON_MOBILE && (
+              <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ color: '#fff', fontSize: '13.5px', fontWeight: '700', marginBottom: '6px' }}>Connect your phone</div>
+                <div style={para}>
+                  Copy the sync key here, then on your phone tap the cloud button and paste it in. iPhones
+                  can paste what a Mac copied when both use the same Apple Account.
+                </div>
+                <button onClick={async () => {
+                  let ok = false;
+                  try { await navigator.clipboard.writeText(cfg.token); ok = true; } catch {}
+                  setCopied(ok ? 'copied' : 'show');
+                }} style={{ ...btn(true), width: '100%' }}>
+                  {copied === 'copied' ? 'Copied: now paste it on your phone' : 'Copy sync key'}
+                </button>
+                {copied === 'show' && (
+                  <input readOnly value={cfg.token} onFocus={(e) => e.target.select()} autoFocus
+                    style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.14)', color: '#fff', fontSize: '13px', fontFamily: 'monospace' }} />
+                )}
+                <div style={{ ...para, fontSize: '12px', marginTop: '8px', marginBottom: 0, color: 'rgba(255,255,255,0.4)' }}>
+                  Treat the key like a password: it can read and change your gists.
+                </div>
+              </div>
+            )}
             <div style={{ ...para, fontSize: '12px', marginTop: '12px', marginBottom: 0, color: 'rgba(255,255,255,0.4)' }}>
               The votes live in a private gist on your GitHub account (gist.github.com).
             </div>
@@ -2634,6 +2709,10 @@
           <div style={para}>
             Keep B&F votes the same on your phone and computer. They're stored in a private gist on your
             GitHub account, and each device needs a GitHub token that can only read and write gists.
+          </div>
+          <div style={{ ...para, color: '#fff', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.3)', borderRadius: '10px', padding: '10px 12px' }}>
+            Already syncing on your computer? Click “Copy sync key” in its sync window, then paste it in
+            step 2 below and skip step 1.
           </div>
           <div style={{ color: '#fff', fontSize: '13.5px', fontWeight: '700', marginBottom: '6px' }}>1. Make a gist-only token</div>
           <div style={para}>
