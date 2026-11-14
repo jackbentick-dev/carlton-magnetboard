@@ -23,6 +23,8 @@
         document.querySelector('meta[name=viewport]').setAttribute('content', 'width=1440');
       }
       if (window.CARLTON_MOBILE) document.documentElement.classList.add('m-app');
+      // iPhones only show a button's pressed (:active) state if something listens for touches
+      document.addEventListener('touchstart', function () {}, { passive: true });
     })();
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
@@ -53,9 +55,26 @@
       0%, 100% { box-shadow: 0 0 20px rgba(59,130,246,0.3); }
       50% { box-shadow: 0 0 30px rgba(59,130,246,0.5); }
     }
+    /* Motion follows Emil Kowalski's design-engineering rules (see CLAUDE.md). The built-in CSS
+       easings are too weak, so everything uses these stronger curves. */
+    :root {
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);        /* anything entering, leaving or responding to a press */
+      --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);    /* things moving while they stay on screen */
+      --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);     /* iOS-style sheet */
+    }
     @keyframes float-in {
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+    /* Popovers and dialogs: never from scale(0); start nearly full size and fade */
+    @keyframes pop-in {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    /* First load only: blocks rise in one after another (short delays, never blocks taps) */
+    @keyframes m-rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: none; }
     }
     @keyframes magnet-settle {
       0% { opacity: 0; transform: scale(1.14); }
@@ -65,10 +84,6 @@
     @keyframes shimmer {
       0% { background-position: -200% 0; }
       100% { background-position: 200% 0; }
-    }
-    @keyframes sheet-up {
-      from { transform: translateY(100%); }
-      to { transform: translateY(0); }
     }
     @keyframes fade-in {
       from { opacity: 0; }
@@ -85,7 +100,49 @@
     button { font-family: 'Inter', sans-serif; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
       -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     select, input { -webkit-tap-highlight-color: transparent; }
+
+    /* Every button answers a press at once: a small, quick squeeze */
+    button { transition: transform 160ms var(--ease-out); }
     button:not(:disabled):active { transform: scale(0.97); }
+
+    /* Hover effects only for a real mouse. On touch screens a tap counts as a hover and sticks. */
+    .tb { background-color: var(--tb); transition: background-color 150ms ease, transform 160ms var(--ease-out); }
+    .side-row {
+      background-color: rgba(255,255,255,0.04); border: 1px solid transparent;
+      transition: background-color 150ms ease, border-color 150ms ease, transform 200ms var(--ease-out);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .tb:hover { background-color: var(--tb-hover); }
+      .side-row:hover { background-color: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.1); transform: translateX(2px); }
+    }
+
+    /* ---- Phone app ---- */
+    /* Rows in lists and menus: a highlight and a barely-there squeeze (a full 0.97 looks wrong on a wide row) */
+    .m-row { transition: background-color 150ms ease, transform 160ms var(--ease-out); }
+    button.m-row:not(:disabled):active { background-color: rgba(255,255,255,0.07); transform: scale(0.985); }
+    /* Small round buttons and switch segments keep their look but get a finger-sized (44px+) target */
+    .m-hit::after { content: ''; position: absolute; inset: -5px; }
+    .m-seg::after { content: ''; position: absolute; inset: -9px 0; }
+    /* While a sheet is open the app behind steps back, like a stack of cards */
+    .m-shell { transform-origin: center top; transition: transform 450ms var(--ease-drawer), border-radius 450ms var(--ease-drawer); }
+    html[data-sheet-open] .m-shell { transform: scale(0.94) translateY(calc(env(safe-area-inset-top) + 8px)); border-radius: 16px; overflow: hidden; }
+    .m-stagger > * { animation: m-rise 320ms var(--ease-out) both; }
+    .m-stagger > :nth-child(2) { animation-delay: 40ms; }
+    .m-stagger > :nth-child(3) { animation-delay: 80ms; }
+    .m-stagger > :nth-child(4) { animation-delay: 120ms; }
+    .m-stagger > :nth-child(5) { animation-delay: 160ms; }
+    .m-stagger > :nth-child(6) { animation-delay: 200ms; }
+    .m-stagger > :nth-child(n + 7) { animation-delay: 240ms; }
+    .m-balance { text-wrap: balance; }
+
+    /* Reduced motion means fewer and gentler animations, not none: keep fades, drop movement */
+    @media (prefers-reduced-motion: reduce) {
+      button:not(:disabled):active, button.m-row:not(:disabled):active { transform: none; }
+      .side-row:hover { transform: none; }
+      .m-shell, html[data-sheet-open] .m-shell { transform: none; transition: none; border-radius: 0; }
+      .m-stagger > * { animation-name: fade-in; }
+      .magnet-enter { animation: fade-in 0.2s ease; }
+    }
   </style>
 </head>
 <body>

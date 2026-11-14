@@ -1,4 +1,5 @@
 // carlton-magnetboard: APP (generated from app.src.jsx by `npm run build` — do not edit)
+function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
 // ---- Season context: one season renders at a time (App is re-keyed on switch) ----
 let S_YEAR = 2026,
   S_PLAYERS,
@@ -36,6 +37,16 @@ const {
   useLayoutEffect,
   useMemo
 } = React;
+
+// Motion tokens, after Emil Kowalski's design-engineering rules (the HTML's CSS has the same
+// curves): ease-out for anything entering, leaving or answering a press; never ease-in; plain
+// `ease` only for colour changes; UI motion under 300ms (sheets up to 450ms); transform and
+// opacity only; transitions rather than keyframes wherever a tap can interrupt.
+const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
+const EASE_DRAWER = 'cubic-bezier(0.32, 0.72, 0, 1)';
+const REDUCED_MOTION = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Buttons that change colour: name the properties (never `all`) and keep the press squeeze
+const BTN_T = `background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 160ms ${EASE_OUT}`;
 const calculateAge = dob => {
   const birth = new Date(dob);
   const today = new Date(`${S_YEAR}-01-31`);
@@ -159,6 +170,7 @@ const PlayerPhoto = ({
   size = 36
 }) => {
   const [, bump] = useState(0);
+  const [ready, setReady] = useState(null); // { src, fade }: which source has loaded, and whether to fade
   const local = player.number == null ? [] : PHOTO_EXTS.map(ext => `players/${player.number}.${ext}`);
   const cdn = PLAYER_PHOTOS[player.number] ? [PLAYER_PHOTOS[player.number]] : [];
   const src = (LOCAL_PHOTOS_FIRST ? [...local, ...cdn] : [...cdn, ...local]).find(s => !deadPhotoSrc.has(s));
@@ -194,11 +206,22 @@ const PlayerPhoto = ({
       overflow: 'hidden'
     }
   }, /*#__PURE__*/React.createElement("img", {
+    key: src,
+    ref: el => {
+      if (el && el.complete && el.naturalWidth && !(ready && ready.src === src)) setReady({
+        src,
+        fade: false
+      });
+    },
     src: src,
     alt: player.name,
     loading: "lazy",
     decoding: "async",
     draggable: false,
+    onLoad: () => setReady(r => r && r.src === src ? r : {
+      src,
+      fade: true
+    }),
     onError: () => {
       deadPhotoSrc.add(src);
       bump(n => n + 1);
@@ -207,7 +230,9 @@ const PlayerPhoto = ({
       width: '100%',
       height: '100%',
       objectFit: 'cover',
-      objectPosition: 'top center'
+      objectPosition: 'top center',
+      opacity: ready && ready.src === src ? 1 : 0,
+      transition: ready && ready.src === src && ready.fade ? 'opacity 200ms ease' : 'none'
     }
   }));
 };
@@ -241,7 +266,7 @@ const GlassCard = ({
   children,
   style,
   ...props
-}) => /*#__PURE__*/React.createElement("div", {
+}) => /*#__PURE__*/React.createElement("div", _extends({
   style: {
     background: 'linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)',
     backdropFilter: 'blur(10px)',
@@ -249,9 +274,8 @@ const GlassCard = ({
     border: '1px solid rgba(255,255,255,0.08)',
     boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
     ...style
-  },
-  ...props
-}, children);
+  }
+}, props), children);
 
 // Fixture Panel
 const FixturePanel = ({
@@ -306,7 +330,7 @@ const FixturePanel = ({
       fontWeight: '700',
       letterSpacing: '1px'
     }
-  }, wins, "–", losses, draws ? `–${draws}` : '')), /*#__PURE__*/React.createElement("button", {
+  }, wins, "\u2013", losses, draws ? `–${draws}` : '')), /*#__PURE__*/React.createElement("button", {
     onClick: onSync,
     disabled: syncState === 'syncing',
     style: {
@@ -372,7 +396,7 @@ const FixturePanel = ({
         letterSpacing: '0.5px',
         color: r.result === 'W' ? '#22c55e' : r.result === 'D' ? '#fbbf24' : '#f87171'
       }
-    }, r.result, " ", r.for, "–", r.against) : played ? /*#__PURE__*/React.createElement("span", {
+    }, r.result, " ", r.for, "\u2013", r.against) : played ? /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: '10px',
         color: 'rgba(255,255,255,0.35)',
@@ -428,7 +452,7 @@ const FixturePanel = ({
         color: 'rgba(255,255,255,0.5)',
         fontSize: '12px'
       }
-    }, game.date, " • ", game.time), /*#__PURE__*/React.createElement("div", {
+    }, game.date, " \u2022 ", game.time), /*#__PURE__*/React.createElement("div", {
       style: {
         color: 'rgba(255,255,255,0.35)',
         fontSize: '11px'
@@ -456,7 +480,7 @@ const RaceChart = ({
         textAlign: 'center',
         padding: '40px 20px'
       }
-    }, "No votes recorded yet — the race chart builds as you vote each round.");
+    }, "No votes recorded yet \u2014 the race chart builds as you vote each round.");
   }
   const top5 = playerTotals.filter(pl => pl.games > 0).slice(0, 5);
   const series = top5.map((pl, i) => {
@@ -723,7 +747,7 @@ const BFPanel = ({
       color: hasRatings ? '#22c55e' : 'rgba(255,255,255,0.5)',
       cursor: 'pointer',
       fontWeight: '700',
-      transition: 'all 0.15s ease'
+      transition: BTN_T
     }
   }, hasRatings ? '✓ Wheelo' : '+ Wheelo')), showImport && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -774,7 +798,7 @@ const BFPanel = ({
       fontSize: '10px',
       fontWeight: '700',
       cursor: 'pointer',
-      transition: 'transform 0.1s ease'
+      transition: `transform 160ms ${EASE_OUT}`
     }
   }, "Import"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
@@ -810,7 +834,7 @@ const BFPanel = ({
       fontSize: '11px',
       fontWeight: '700',
       cursor: 'pointer',
-      transition: 'all 0.15s ease'
+      transition: BTN_T
     }
   }, v === 'vote' ? 'Vote' : v === 'leaderboard' ? 'Leaderboard' : 'Race'))), view === 'race' ? /*#__PURE__*/React.createElement(RaceChart, {
     votes: votes,
@@ -936,7 +960,7 @@ const BFPanel = ({
         fontSize: '8px'
       }
     }, Math.round(stats.tog), "%"))), stats?.rating != null && (score === undefined || score === null) && /*#__PURE__*/React.createElement("span", {
-      title: "Played this round — no vote yet",
+      title: "Played this round \u2014 no vote yet",
       style: {
         width: '6px',
         height: '6px',
@@ -962,7 +986,7 @@ const BFPanel = ({
         fontSize: '12px',
         fontWeight: '700',
         cursor: 'pointer',
-        transition: 'all 0.1s ease'
+        transition: BTN_T
       }
     }, s))));
   }))) : /*#__PURE__*/React.createElement("div", {
@@ -1029,7 +1053,7 @@ const BFPanel = ({
           color: 'rgba(255,255,255,0.4)',
           fontSize: '11px'
         }
-      }, player.games, " gm • ", player.games > 0 ? (player.total / player.games).toFixed(2) : '0', " avg", avgRating !== null ? ` • ${avgRating.toFixed(1)} rtg` : '', avgTog !== null ? ` • ${Math.round(avgTog)}% TOG` : '')), /*#__PURE__*/React.createElement("div", {
+      }, player.games, " gm \u2022 ", player.games > 0 ? (player.total / player.games).toFixed(2) : '0', " avg", avgRating !== null ? ` • ${avgRating.toFixed(1)} rtg` : '', avgTog !== null ? ` • ${Math.round(avgTog)}% TOG` : '')), /*#__PURE__*/React.createElement("div", {
         style: {
           background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)',
           padding: '6px 14px',
@@ -1241,7 +1265,7 @@ const StatsPanel = () => {
     disabled: roundIdx <= 0,
     title: "Previous",
     style: arrowStyle(roundIdx <= 0)
-  }, "‹"), /*#__PURE__*/React.createElement("select", {
+  }, "\u2039"), /*#__PURE__*/React.createElement("select", {
     value: selRound,
     onChange: e => setSelRound(e.target.value),
     style: {
@@ -1265,7 +1289,7 @@ const StatsPanel = () => {
     disabled: roundIdx >= rounds.length - 1,
     title: "Next",
     style: arrowStyle(roundIdx >= rounds.length - 1)
-  }, "›")), /*#__PURE__*/React.createElement("div", {
+  }, "\u203A")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '3px',
@@ -1379,9 +1403,10 @@ const StatsPanel = () => {
     style: {
       height: '100%',
       borderRadius: '3px',
-      width: `${p.value / maxVal * 100}%`,
+      width: '100%',
+      transform: `translateX(${p.value / maxVal * 100 - 100}%)`,
       background: `linear-gradient(90deg, ${statDef.color}88, ${statDef.color})`,
-      transition: 'width 0.3s ease'
+      transition: `transform 250ms ${EASE_OUT}`
     }
   })), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1501,7 +1526,7 @@ const ComparePanel = ({
       color: 'rgba(255,255,255,0.4)',
       fontSize: '10px'
     }
-  }, avg ? `${avg.games} games` : 'no stats', " • ", pl.height, "cm • ", calculateAge(pl.dob), "y")));
+  }, avg ? `${avg.games} games` : 'no stats', " \u2022 ", pl.height, "cm \u2022 ", calculateAge(pl.dob), "y")));
   return /*#__PURE__*/React.createElement(GlassCard, {
     style: {
       flex: 1,
@@ -1924,7 +1949,7 @@ const LeftPanel = ({
       fontSize: '11px',
       fontWeight: '700',
       cursor: 'pointer',
-      transition: 'all 0.15s ease',
+      transition: BTN_T,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -2088,7 +2113,7 @@ const Magnet = ({
     style: {
       opacity: 0.4
     }
-  }, "•"), /*#__PURE__*/React.createElement("span", null, age, "y"))))));
+  }, "\u2022"), /*#__PURE__*/React.createElement("span", null, age, "y"))))));
 };
 
 // AFL field — bird's-eye oval at true proportions (165m x 138m, 1m ≈ 3px)
@@ -2539,7 +2564,7 @@ const Sidebar = ({
       fontWeight: '700',
       border: '1px solid rgba(34,197,94,0.3)'
     }
-  }, "✓ TEAM COMPLETE (18 + 5)"), comp && /*#__PURE__*/React.createElement("div", {
+  }, "\u2713 TEAM COMPLETE (18 + 5)"), comp && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       justifyContent: 'space-between',
@@ -2611,7 +2636,7 @@ const Sidebar = ({
         fontSize: '10px',
         fontWeight: '700',
         cursor: 'pointer',
-        transition: 'all 0.15s ease',
+        transition: BTN_T,
         boxShadow: filter === key ? '0 2px 8px rgba(0,0,0,0.2)' : 'none'
       }
     }, pos);
@@ -2673,7 +2698,7 @@ const Sidebar = ({
       fontSize: '11px',
       cursor: 'pointer'
     }
-  }, "✕") : /*#__PURE__*/React.createElement("span", {
+  }, "\u2715") : /*#__PURE__*/React.createElement("span", {
     title: "Press / to search",
     style: {
       padding: '1px 7px',
@@ -2703,8 +2728,8 @@ const Sidebar = ({
       onDragStart: e => onDragStart(e, player),
       onPointerDown: e => onPointerStart && onPointerStart(e, player, 'sidebar'),
       onClick: e => onOpenCard && onOpenCard(e, player),
+      className: "side-row",
       style: {
-        background: 'rgba(255,255,255,0.04)',
         borderRadius: '12px',
         padding: '12px 14px',
         marginBottom: '8px',
@@ -2712,19 +2737,7 @@ const Sidebar = ({
         touchAction: 'pan-y',
         display: 'flex',
         alignItems: 'center',
-        gap: '12px',
-        transition: 'all 0.15s ease',
-        border: '1px solid transparent'
-      },
-      onMouseEnter: e => {
-        e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
-        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
-        e.currentTarget.style.transform = 'translateX(4px)';
-      },
-      onMouseLeave: e => {
-        e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
-        e.currentTarget.style.borderColor = 'transparent';
-        e.currentTarget.style.transform = 'translateX(0)';
+        gap: '12px'
       }
     }, /*#__PURE__*/React.createElement(PlayerPhoto, {
       player: player,
@@ -2767,7 +2780,7 @@ const Sidebar = ({
         color: '#fbbf24',
         fontSize: '12px'
       }
-    }, "©"), player.recruit && /*#__PURE__*/React.createElement("span", {
+    }, "\xA9"), player.recruit && /*#__PURE__*/React.createElement("span", {
       style: {
         background: 'rgba(34,197,94,0.2)',
         color: '#22c55e',
@@ -2782,7 +2795,7 @@ const Sidebar = ({
         fontSize: '11px',
         marginTop: '2px'
       }
-    }, player.height, "cm • ", calculateAge(player.dob), "yo")));
+    }, player.height, "cm \u2022 ", calculateAge(player.dob), "yo")));
   })));
 };
 const POS_NAMES = {
@@ -2898,7 +2911,7 @@ const PlayerSummary = ({
       fontSize: '11px',
       marginTop: '3px'
     }
-  }, POS_NAMES[player.position] || player.position, " • ", player.height, "cm • ", calculateAge(player.dob), "y"))), /*#__PURE__*/React.createElement("div", {
+  }, POS_NAMES[player.position] || player.position, " \u2022 ", player.height, "cm \u2022 ", calculateAge(player.dob), "y"))), /*#__PURE__*/React.createElement("div", {
     style: {
       margin: '14px 0 8px',
       display: 'flex',
@@ -3025,9 +3038,13 @@ const PlayerCard = ({
     if (left + w > window.innerWidth - pad) left = rect.left - w - gap;
     left = Math.max(pad, Math.min(window.innerWidth - w - pad, left));
     const top = Math.max(pad, Math.min(window.innerHeight - h - pad, rect.top));
+    // Origin-aware: it scales in from the side facing what was clicked, at that height
+    const originX = left < rect.left ? w : 0;
+    const originY = Math.round(Math.max(0, Math.min(h, rect.top + rect.height / 2 - top)));
     setPos({
       left,
-      top
+      top,
+      origin: `${originX}px ${originY}px`
     });
   }, [rect, player.id]);
   useEffect(() => {
@@ -3074,7 +3091,8 @@ const PlayerCard = ({
       borderRadius: '16px',
       boxShadow: '0 24px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08)',
       padding: '14px',
-      animation: 'float-in 0.16s ease'
+      animation: `pop-in 150ms ${EASE_OUT}`,
+      transformOrigin: pos.origin || 'center'
     }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
@@ -3092,7 +3110,7 @@ const PlayerCard = ({
       fontSize: '11px',
       cursor: 'pointer'
     }
-  }, "✕"), /*#__PURE__*/React.createElement(PlayerSummary, {
+  }, "\u2715"), /*#__PURE__*/React.createElement(PlayerSummary, {
     player: player,
     votes: votes
   }), /*#__PURE__*/React.createElement("div", {
@@ -3145,75 +3163,172 @@ const loadRatings = () => {
   }
 };
 
-// Undo toast (clear, remove). ⌘Z/Ctrl+Z undoes while it's showing.
+// Undo toast (clear, remove). ⌘Z/Ctrl+Z undoes while it's showing. Built on the rules behind
+// Emil Kowalski's Sonner: transitions rather than keyframes so it can be interrupted; it leaves
+// the way it came (up from the bottom, swipe down to dismiss); out faster than in; and the
+// timer pauses while the app is in the background.
+const TOAST_MS = 8000;
 const useUndoToast = () => {
   const [toast, setToast] = useState(null);
-  const timer = useRef(null);
-  const showToast = (msg, undo) => {
+  const timer = useRef(null),
+    gone = useRef(null),
+    left = useRef(0),
+    since = useRef(0);
+  const live = useRef(null);
+  live.current = toast;
+  // instant = no exit animation, for the keyboard (keyboard actions never animate)
+  const dismiss = instant => {
     clearTimeout(timer.current);
+    clearTimeout(gone.current);
+    if (instant === true) {
+      setToast(null);
+      return;
+    }
+    setToast(t => t ? {
+      ...t,
+      leaving: true
+    } : t);
+    gone.current = setTimeout(() => setToast(null), 220);
+  };
+  const arm = ms => {
+    clearTimeout(timer.current);
+    left.current = ms;
+    since.current = Date.now();
+    timer.current = setTimeout(dismiss, ms);
+  };
+  const showToast = (msg, undo) => {
+    clearTimeout(gone.current);
     setToast({
       msg,
       undo,
       id: Date.now()
     });
-    timer.current = setTimeout(() => setToast(null), 8000);
+    arm(TOAST_MS);
   };
-  const runUndo = () => {
-    if (toast && toast.undo) toast.undo();
-    clearTimeout(timer.current);
-    setToast(null);
+  const runUndo = instant => {
+    if (toast && toast.undo && !toast.leaving) toast.undo();
+    dismiss(instant === true);
   };
   useEffect(() => {
-    if (!toast || !toast.undo) return;
+    if (!toast || !toast.undo || toast.leaving) return;
     const key = e => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !isTyping(e.target)) {
         e.preventDefault();
-        runUndo();
+        runUndo(true);
       }
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [toast]);
+  useEffect(() => {
+    const vis = () => {
+      if (!live.current || live.current.leaving) return;
+      if (document.visibilityState === 'hidden') {
+        clearTimeout(timer.current);
+        left.current = Math.max(2000, left.current - (Date.now() - since.current));
+      } else arm(left.current);
+    };
+    document.addEventListener('visibilitychange', vis);
+    return () => {
+      document.removeEventListener('visibilitychange', vis);
+      clearTimeout(timer.current);
+      clearTimeout(gone.current);
+    };
+  }, []);
   return {
     toast,
     showToast,
-    runUndo
+    runUndo,
+    dismissToast: dismiss
   };
 };
+const TOAST_IN = 'transform 400ms ease, opacity 400ms ease';
+const TOAST_OUT = `transform 200ms ${EASE_OUT}, opacity 200ms ease`;
 const ToastPill = ({
   toast,
-  onUndo
-}) => /*#__PURE__*/React.createElement("div", {
-  key: toast.id,
-  style: {
-    pointerEvents: 'auto',
-    animation: 'float-in 0.18s ease',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '14px',
-    padding: '9px 10px 9px 16px',
-    background: 'rgba(13,28,54,0.97)',
-    border: '1px solid rgba(255,255,255,0.16)',
-    borderRadius: '12px',
-    boxShadow: '0 16px 40px rgba(0,0,0,0.55)',
-    color: '#fff',
-    fontSize: '12.5px',
-    fontWeight: '600'
-  }
-}, toast.msg, toast.undo && /*#__PURE__*/React.createElement("button", {
-  onClick: onUndo,
-  title: "Undo (⌘Z)",
-  style: {
-    padding: '6px 12px',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    background: 'rgba(96,165,250,0.15)',
-    border: '1px solid rgba(96,165,250,0.35)',
-    color: '#60a5fa',
-    fontSize: '12px',
-    fontWeight: '800'
-  }
-}, "Undo"));
+  onUndo,
+  onDismiss,
+  big
+}) => {
+  const ref = useRef(null);
+  const drag = useRef(null);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const r = requestAnimationFrame(() => setShown(true));
+    return () => cancelAnimationFrame(r);
+  }, []);
+  const out = !shown || !!toast.leaving;
+  const transition = toast.leaving ? TOAST_OUT : TOAST_IN;
+
+  // Swipe down to dismiss. The pill follows the finger directly (no React state per move);
+  // a short flick is enough (speed, not just distance); upwards it resists rather than stops.
+  const down = e => {
+    if (drag.current || toast.leaving || e.target.closest('button')) return; // one finger at a time
+    drag.current = {
+      id: e.pointerId,
+      y: e.clientY,
+      t: Date.now(),
+      dy: 0
+    };
+    ref.current.style.transition = 'none';
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+  };
+  const move = e => {
+    const d = drag.current;
+    if (!d || e.pointerId !== d.id) return;
+    const raw = e.clientY - d.y;
+    d.dy = raw >= 0 ? raw : -Math.pow(-raw, 0.6);
+    ref.current.style.transform = `translateY(${d.dy}px)`;
+  };
+  const up = e => {
+    const d = drag.current;
+    if (!d || e.pointerId !== d.id) return;
+    drag.current = null;
+    const speed = Math.abs(d.dy) / Math.max(1, Date.now() - d.t);
+    ref.current.style.transition = transition;
+    if (d.dy > 4 && (d.dy >= 36 || speed > 0.11) && onDismiss) onDismiss();else ref.current.style.transform = 'translateY(0)';
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    ref: ref,
+    onPointerDown: down,
+    onPointerMove: move,
+    onPointerUp: up,
+    onPointerCancel: up,
+    style: {
+      pointerEvents: toast.leaving ? 'none' : 'auto',
+      touchAction: 'none',
+      transform: out && !REDUCED_MOTION ? 'translateY(calc(100% + 24px))' : 'translateY(0)',
+      opacity: out ? 0 : 1,
+      transition,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '14px',
+      padding: big ? '10px 10px 10px 18px' : '9px 10px 9px 16px',
+      background: 'rgba(13,28,54,0.97)',
+      border: '1px solid rgba(255,255,255,0.16)',
+      borderRadius: big ? '14px' : '12px',
+      boxShadow: '0 16px 40px rgba(0,0,0,0.55)',
+      color: '#fff',
+      fontSize: big ? '15px' : '12.5px',
+      fontWeight: '600'
+    }
+  }, toast.msg, toast.undo && /*#__PURE__*/React.createElement("button", {
+    onClick: onUndo,
+    title: "Undo (\u2318Z)",
+    style: {
+      padding: big ? '8px 14px' : '6px 12px',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      background: 'rgba(96,165,250,0.15)',
+      border: '1px solid rgba(96,165,250,0.35)',
+      color: '#60a5fa',
+      fontSize: big ? '15px' : '12px',
+      fontWeight: '800'
+    }
+  }, "Undo"));
+};
 
 // Team balance: talls = non-midfielders 193cm+ (rucks included)
 const teamBalance = (selected, fieldCount) => {
@@ -4103,7 +4218,7 @@ const SyncPanel = ({
       color: '#60a5fa',
       fontWeight: '700'
     }
-  }, "Open GitHub’s token page ↗"), ". Only “gist” is ticked: leave it that way, pick an expiry, then Generate token and copy it."), /*#__PURE__*/React.createElement("div", {
+  }, "Open GitHub\u2019s token page \u2197"), ". Only \u201Cgist\u201D is ticked: leave it that way, pick an expiry, then Generate token and copy it."), /*#__PURE__*/React.createElement("div", {
     style: {
       color: '#fff',
       fontSize: '13.5px',
@@ -4123,7 +4238,7 @@ const SyncPanel = ({
     onKeyDown: e => {
       if (e.key === 'Enter') connect();
     },
-    placeholder: "ghp_…",
+    placeholder: "ghp_\u2026",
     autoComplete: "off",
     spellCheck: false,
     onBlur: unshiftAfterKeyboard,
@@ -4166,12 +4281,20 @@ const SyncPanel = ({
   }, "Same token or a second one: both find the same gist. Connect the computer first so the votes already on it go up first."));
 };
 
-// Centred dialog for the desktop board
+// Centred dialog for the desktop board. It scales in from the centre (a dialog isn't anchored to
+// what opened it, unlike a popover) and leaves faster than it arrives. Escape closes it at once:
+// keyboard actions never animate.
 const Modal = ({
   title,
   onClose,
   children
 }) => {
+  const [closing, setClosing] = useState(false);
+  const close = () => {
+    if (closing) return;
+    setClosing(true);
+    setTimeout(onClose, 150);
+  };
   useEffect(() => {
     const key = e => {
       if (e.key === 'Escape') onClose();
@@ -4180,7 +4303,7 @@ const Modal = ({
     return () => window.removeEventListener('keydown', key);
   }, [onClose]);
   return /*#__PURE__*/React.createElement("div", {
-    onClick: onClose,
+    onClick: close,
     style: {
       position: 'fixed',
       inset: 0,
@@ -4189,7 +4312,9 @@ const Modal = ({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      animation: 'fade-in 0.15s ease'
+      animation: 'fade-in 150ms ease',
+      opacity: closing ? 0 : 1,
+      transition: 'opacity 150ms ease'
     }
   }, /*#__PURE__*/React.createElement("div", {
     onClick: e => e.stopPropagation(),
@@ -4201,7 +4326,9 @@ const Modal = ({
       border: '1px solid rgba(255,255,255,0.14)',
       borderRadius: '18px',
       boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
-      animation: 'float-in 0.18s ease'
+      animation: `pop-in 200ms ${EASE_OUT}`,
+      transform: closing ? 'scale(0.97)' : 'none',
+      transition: `transform 150ms ${EASE_OUT}`
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4217,7 +4344,7 @@ const Modal = ({
       fontWeight: '800'
     }
   }, title), /*#__PURE__*/React.createElement("button", {
-    onClick: onClose,
+    onClick: close,
     style: {
       padding: '6px 13px',
       borderRadius: '999px',
@@ -4270,7 +4397,8 @@ function App({
   const {
     toast,
     showToast,
-    runUndo
+    runUndo,
+    dismissToast
   } = useUndoToast();
 
   // --- Vote sync with the phone ---
@@ -4664,82 +4792,62 @@ function App({
     title: "Take every player off the board (you can undo)",
     style: {
       padding: '10px 13px',
-      background: 'rgba(239,68,68,0.1)',
+      '--tb': 'rgba(239,68,68,0.1)',
+      '--tb-hover': 'rgba(239,68,68,0.2)',
       color: '#f87171',
       border: '1px solid rgba(239,68,68,0.25)',
       borderRadius: '10px',
       cursor: 'pointer',
       fontSize: '12px',
-      fontWeight: '700',
-      transition: 'all 0.15s ease'
+      fontWeight: '700'
     },
-    onMouseEnter: e => {
-      e.currentTarget.style.background = 'rgba(239,68,68,0.2)';
-    },
-    onMouseLeave: e => {
-      e.currentTarget.style.background = 'rgba(239,68,68,0.1)';
-    }
-  }, "✕ Clear board"), /*#__PURE__*/React.createElement("button", {
+    className: "tb"
+  }, "\u2715 Clear board"), /*#__PURE__*/React.createElement("button", {
     onClick: exportBackup,
     title: "Download all votes, ratings and the board layout as a JSON file",
     style: {
       padding: '10px 13px',
-      background: 'rgba(59,130,246,0.1)',
+      '--tb': 'rgba(59,130,246,0.1)',
+      '--tb-hover': 'rgba(59,130,246,0.2)',
       color: '#60a5fa',
       border: '1px solid rgba(59,130,246,0.25)',
       borderRadius: '10px',
       cursor: 'pointer',
       fontSize: '12px',
-      fontWeight: '700',
-      transition: 'all 0.15s ease'
+      fontWeight: '700'
     },
-    onMouseEnter: e => {
-      e.currentTarget.style.background = 'rgba(59,130,246,0.2)';
-    },
-    onMouseLeave: e => {
-      e.currentTarget.style.background = 'rgba(59,130,246,0.1)';
-    }
-  }, "⭳ Backup"), /*#__PURE__*/React.createElement("button", {
+    className: "tb"
+  }, "\u2B73 Backup"), /*#__PURE__*/React.createElement("button", {
     onClick: exportTeamSheet,
     title: "Export the current board as a classic team-sheet PNG (lines read top-to-bottom off the board)",
     style: {
       padding: '10px 13px',
-      background: 'rgba(34,197,94,0.1)',
+      '--tb': 'rgba(34,197,94,0.1)',
+      '--tb-hover': 'rgba(34,197,94,0.2)',
       color: '#4ade80',
       border: '1px solid rgba(34,197,94,0.25)',
       borderRadius: '10px',
       cursor: 'pointer',
       fontSize: '12px',
-      fontWeight: '700',
-      transition: 'all 0.15s ease'
+      fontWeight: '700'
     },
-    onMouseEnter: e => {
-      e.currentTarget.style.background = 'rgba(34,197,94,0.2)';
-    },
-    onMouseLeave: e => {
-      e.currentTarget.style.background = 'rgba(34,197,94,0.1)';
-    }
-  }, "⭳ Team sheet"), /*#__PURE__*/React.createElement("button", {
+    className: "tb"
+  }, "\u2B73 Team sheet"), /*#__PURE__*/React.createElement("button", {
     onClick: () => fileInputRef.current && fileInputRef.current.click(),
     title: "Restore votes, ratings and board layout from a backup file",
     style: {
       padding: '10px 13px',
-      background: 'rgba(255,255,255,0.05)',
+      '--tb': 'rgba(255,255,255,0.05)',
+      '--tb-hover': 'rgba(255,255,255,0.1)',
       color: 'rgba(255,255,255,0.6)',
       border: '1px solid rgba(255,255,255,0.12)',
       borderRadius: '10px',
       cursor: 'pointer',
       fontSize: '12px',
-      fontWeight: '700',
-      transition: 'all 0.15s ease'
+      fontWeight: '700'
     },
-    onMouseEnter: e => {
-      e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-    },
-    onMouseLeave: e => {
-      e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-    }
-  }, "⭱ Restore"), /*#__PURE__*/React.createElement("button", {
+    className: "tb"
+  }, "\u2B71 Restore"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setSyncOpen(true),
     title: sync.status ? sync.status.state === 'error' ? sync.status.msg : `Votes last synced ${ago(sync.status.last)}` : 'Sync B&F votes with your phone',
     style: {
@@ -4752,7 +4860,7 @@ function App({
       fontSize: '12px',
       fontWeight: '700'
     }
-  }, "☁ ", syncLabel(sync.status)), window.CARLTON_PHONE && /*#__PURE__*/React.createElement("button", {
+  }, "\u2601 ", syncLabel(sync.status)), window.CARLTON_PHONE && /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       try {
         localStorage.setItem('carlton-view', 'mobile');
@@ -4841,7 +4949,7 @@ function App({
       fontSize: '11px',
       fontWeight: '500'
     }
-  }, "Click a player for their card • Double-click to remove")), Object.entries(fieldPlayers).map(([id, pos]) => {
+  }, "Click a player for their card \u2022 Double-click to remove")), Object.entries(fieldPlayers).map(([id, pos]) => {
     if (pos.isInterchange) return null;
     const player = S_PLAYERS.find(p => p.id === parseInt(id));
     if (!player) return null;
@@ -4957,7 +5065,7 @@ function App({
           cursor: 'grab',
           touchAction: 'none',
           position: 'relative',
-          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+          transition: `transform 160ms ${EASE_OUT}, box-shadow 150ms ease`,
           boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
         }
       }, player.captain && /*#__PURE__*/React.createElement("div", {
@@ -5086,7 +5194,8 @@ function App({
     }
   }, /*#__PURE__*/React.createElement(ToastPill, {
     toast: toast,
-    onUndo: runUndo
+    onUndo: runUndo,
+    onDismiss: dismissToast
   })), touchDrag && /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'fixed',
@@ -5266,6 +5375,7 @@ const IconButton = ({
   onClick: onClick,
   "aria-label": label,
   disabled: disabled,
+  className: "m-hit",
   style: {
     position: 'relative',
     width: size,
@@ -5297,41 +5407,60 @@ const IconButton = ({
   }
 }));
 
-// iOS-style segmented control: white thumb with navy text on the active segment
+// iOS-style segmented control: one white thumb that slides to the chosen option (it's moving on
+// screen, so it travels rather than blinking between two places). Equal columns keep it lined up.
 const Segmented = ({
   options,
   value,
   onChange,
   small,
   style
-}) => /*#__PURE__*/React.createElement("div", {
-  style: {
-    display: 'flex',
-    padding: 2,
-    gap: 2,
-    borderRadius: 10,
-    background: M.fill,
-    ...style
-  }
-}, options.map(([k, label]) => /*#__PURE__*/React.createElement("button", {
-  key: k,
-  onClick: () => onChange(k),
-  style: {
-    flex: 1,
-    padding: small ? '5px 11px' : '7px 10px',
-    borderRadius: 8,
-    border: 'none',
-    cursor: 'pointer',
-    background: value === k ? '#fff' : 'transparent',
-    color: value === k ? CARLTON_NAVY : 'rgba(255,255,255,0.78)',
-    boxShadow: value === k ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
-    fontSize: small ? 13 : 14,
-    fontWeight: 600,
-    fontFamily: 'inherit',
-    whiteSpace: 'nowrap',
-    transition: 'background 0.18s ease, color 0.18s ease'
-  }
-}, label)));
+}) => {
+  const at = Math.max(0, options.findIndex(([k]) => k === value));
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'relative',
+      display: 'grid',
+      gridTemplateColumns: `repeat(${options.length}, 1fr)`,
+      padding: 2,
+      borderRadius: 10,
+      background: M.fill,
+      ...style
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    "aria-hidden": "true",
+    style: {
+      position: 'absolute',
+      top: 2,
+      bottom: 2,
+      left: 2,
+      width: `calc((100% - 4px) / ${options.length})`,
+      borderRadius: 8,
+      background: '#fff',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+      transform: `translateX(${at * 100}%)`,
+      transition: REDUCED_MOTION ? 'none' : `transform 250ms ${EASE_OUT}`
+    }
+  }), options.map(([k, label]) => /*#__PURE__*/React.createElement("button", {
+    key: k,
+    className: "m-seg",
+    onClick: () => onChange(k),
+    style: {
+      position: 'relative',
+      padding: small ? '5px 11px' : '7px 10px',
+      borderRadius: 8,
+      border: 'none',
+      cursor: 'pointer',
+      background: 'transparent',
+      color: value === k ? CARLTON_NAVY : 'rgba(255,255,255,0.78)',
+      fontSize: small ? 13 : 14,
+      fontWeight: 600,
+      fontFamily: 'inherit',
+      whiteSpace: 'nowrap',
+      transition: `color 200ms ease, transform 160ms ${EASE_OUT}`
+    }
+  }, label)));
+};
 const MButton = ({
   children,
   onClick,
@@ -5370,7 +5499,7 @@ const Card = ({
   style: {
     background: M.card,
     border: `1px solid ${M.sep}`,
-    borderRadius: 18,
+    borderRadius: 22,
     ...style
   }
 }, children);
@@ -5491,6 +5620,7 @@ const EmptyState = ({
     fontWeight: 600
   }
 }, title), /*#__PURE__*/React.createElement("div", {
+  className: "m-balance",
   style: {
     color: M.text2,
     fontSize: 15,
@@ -5538,7 +5668,7 @@ const Ring = ({
     strokeDasharray: c,
     strokeDashoffset: c * (1 - Math.min(1, value / max)),
     style: {
-      transition: 'stroke-dashoffset 0.4s ease'
+      transition: `stroke-dashoffset 300ms ${EASE_OUT}`
     }
   })), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -5592,6 +5722,18 @@ const unshiftAfterKeyboard = () => setTimeout(() => window.scrollTo(0, 0), 60);
 // `pinned` stays above the scrolling part (e.g. the picker's search and filters). Changing
 // `scrollKey` puts the list back at the top. Swipe the top of the sheet down (or tap the
 // backdrop / Done) to close; it slides away rather than vanishing.
+// How many sheets are open. While any is, the app behind steps back (.m-shell in the CSS).
+let openSheets = 0;
+const countSheet = d => {
+  openSheets = Math.max(0, openSheets + d);
+  document.documentElement.toggleAttribute('data-sheet-open', openSheets > 0);
+};
+
+// Motion, after Emil Kowalski's Vaul drawer: the iOS sheet curve; a transition rather than a
+// keyframe animation, so a swipe or a tap on Done can interrupt it mid-flight; while dragging,
+// the panel follows the finger directly (no React render per move); a quick flick closes it
+// (speed, not just distance); dragging up meets friction instead of a hard stop; and it leaves
+// faster than it arrives.
 const Sheet = ({
   title,
   onClose,
@@ -5600,50 +5742,90 @@ const Sheet = ({
   scrollKey
 }) => {
   const view = useVisibleViewport();
-  const headRef = useRef(null);
-  const bodyRef = useRef(null);
+  const headRef = useRef(null),
+    bodyRef = useRef(null),
+    panelRef = useRef(null),
+    backRef = useRef(null);
   const [headH, setHeadH] = useState(64);
-  const [drag, setDrag] = useState(0);
-  const [dragging, setDragging] = useState(false);
+  const [shown, setShown] = useState(false);
   const [closing, setClosing] = useState(false);
-  const start = useRef(null);
+  const drag = useRef(null);
+  const counted = useRef(false);
   useLayoutEffect(() => {
     if (headRef.current) setHeadH(headRef.current.offsetHeight);
   });
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
   }, [scrollKey]);
+  useEffect(() => {
+    counted.current = true;
+    countSheet(1);
+    let r2;
+    const r1 = requestAnimationFrame(() => {
+      r2 = requestAnimationFrame(() => setShown(true));
+    });
+    return () => {
+      cancelAnimationFrame(r1);
+      cancelAnimationFrame(r2);
+      if (counted.current) {
+        counted.current = false;
+        countSheet(-1);
+      }
+    };
+  }, []);
   const panelMax = Math.max(240, view.height - 44);
+  const hidden = !shown || closing;
+  const panelT = `transform ${closing ? 300 : 450}ms ${EASE_DRAWER}`;
+  const backT = `opacity ${closing ? 250 : 350}ms ease`;
   const close = () => {
     if (closing) return;
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    if (counted.current) {
+      counted.current = false;
+      countSheet(-1);
+    }
     setClosing(true);
-    setTimeout(onClose, 200);
+    setTimeout(onClose, REDUCED_MOTION ? 200 : 300);
   };
   const down = e => {
+    if (drag.current || closing || REDUCED_MOTION) return; // one finger at a time
     if (e.target.closest('input, button, select')) return;
-    start.current = {
+    drag.current = {
+      id: e.pointerId,
       y: e.clientY,
-      t: performance.now()
+      t: performance.now(),
+      dy: 0,
+      h: panelRef.current.offsetHeight
     };
-    setDragging(true);
+    panelRef.current.style.transition = 'none';
+    backRef.current.style.transition = 'none';
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {}
   };
   const move = e => {
-    if (start.current) setDrag(Math.max(0, e.clientY - start.current.y));
+    const d = drag.current;
+    if (!d || e.pointerId !== d.id) return;
+    const raw = e.clientY - d.y;
+    d.dy = raw >= 0 ? raw : -Math.pow(-raw, 0.6);
+    panelRef.current.style.transform = `translateY(${d.dy}px)`;
+    backRef.current.style.opacity = String(1 - Math.min(1, Math.max(0, d.dy) / d.h) * 0.7);
   };
   const up = e => {
-    if (!start.current) return;
-    const dy = Math.max(0, e.clientY - start.current.y);
-    const speed = dy / Math.max(1, performance.now() - start.current.t);
-    start.current = null;
-    setDragging(false);
-    if (dy > 120 || dy > 50 && speed > 0.8) close();else setDrag(0);
+    const d = drag.current;
+    if (!d || e.pointerId !== d.id) return;
+    drag.current = null;
+    const speed = d.dy / Math.max(1, performance.now() - d.t); // px per ms, downwards
+    if (d.dy > d.h * 0.25 || d.dy > 12 && speed > 0.4) {
+      close();
+      return;
+    }
+    panelRef.current.style.transition = panelT;
+    panelRef.current.style.transform = 'translateY(0)';
+    backRef.current.style.transition = backT;
+    backRef.current.style.opacity = '1';
   };
-  return ReactDOM.createPortal( /*#__PURE__*/React.createElement("div", {
-    onClick: close,
+  return ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
     style: {
       position: 'fixed',
       left: 0,
@@ -5651,19 +5833,28 @@ const Sheet = ({
       top: view.top,
       height: view.height,
       zIndex: 4000,
-      background: 'rgba(0,0,0,0.5)',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'flex-end',
       fontFamily: M.font,
       color: '#fff',
-      animation: 'fade-in 0.15s ease',
-      opacity: closing ? 0 : 1 - Math.min(drag / 500, 0.5),
-      transition: 'opacity 0.2s ease'
+      fontVariantNumeric: 'tabular-nums',
+      pointerEvents: closing ? 'none' : 'auto'
     }
   }, /*#__PURE__*/React.createElement("div", {
-    onClick: e => e.stopPropagation(),
+    ref: backRef,
+    onClick: close,
     style: {
+      position: 'absolute',
+      inset: 0,
+      background: 'rgba(0,0,0,0.5)',
+      opacity: hidden ? 0 : 1,
+      transition: backT
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    ref: panelRef,
+    style: {
+      position: 'relative',
       maxHeight: panelMax,
       display: 'flex',
       flexDirection: 'column',
@@ -5671,9 +5862,13 @@ const Sheet = ({
       background: '#0e1a30',
       borderRadius: '22px 22px 0 0',
       boxShadow: '0 -10px 40px rgba(0,0,0,0.45)',
-      animation: 'sheet-up 0.26s cubic-bezier(0.2, 0.8, 0.2, 1)',
-      transform: closing ? 'translateY(100%)' : `translateY(${drag}px)`,
-      transition: dragging ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)'
+      ...(REDUCED_MOTION ? {
+        opacity: hidden ? 0 : 1,
+        transition: 'opacity 200ms ease'
+      } : {
+        transform: hidden ? 'translateY(100%)' : 'translateY(0)',
+        transition: panelT
+      })
     }
   }, /*#__PURE__*/React.createElement("div", {
     ref: headRef,
@@ -5717,7 +5912,9 @@ const Sheet = ({
     }
   }, title), /*#__PURE__*/React.createElement("button", {
     onClick: close,
+    className: "m-hit",
     style: {
+      position: 'relative',
       justifySelf: 'end',
       padding: '6px 4px',
       border: 'none',
@@ -5771,7 +5968,7 @@ const SlotTile = ({
     color: '#fff',
     cursor: 'pointer',
     fontFamily: 'inherit',
-    transition: 'background 0.15s ease'
+    transition: `transform 160ms ${EASE_OUT}, background-color 150ms ease, box-shadow 150ms ease`
   }
 }, /*#__PURE__*/React.createElement("span", {
   style: {
@@ -5975,14 +6172,18 @@ const PickerSheet = ({
   }, "Show everyone"))), avail.map(p => /*#__PURE__*/React.createElement("button", {
     key: p.id,
     onClick: () => onPick(p.id),
+    className: "m-row",
+    "data-player-row": "",
     style: {
-      width: '100%',
+      width: 'calc(100% + 16px)',
+      margin: '0 -8px',
       display: 'flex',
       alignItems: 'center',
       gap: 12,
-      padding: '9px 0',
+      padding: '9px 8px',
       background: 'transparent',
       border: 'none',
+      borderRadius: 12,
       color: '#fff',
       cursor: 'pointer',
       textAlign: 'left',
@@ -6032,7 +6233,7 @@ const PickerSheet = ({
       color: M.text2,
       marginTop: 1
     }
-  }, POS_NAMES[p.position] || p.position, " · ", p.height, "cm · ", calculateAge(p.dob))), ra.avg[p.name] !== undefined && /*#__PURE__*/React.createElement("span", {
+  }, POS_NAMES[p.position] || p.position, " \xB7 ", p.height, "cm \xB7 ", calculateAge(p.dob))), ra.avg[p.name] !== undefined && /*#__PURE__*/React.createElement("span", {
     style: {
       textAlign: 'right',
       paddingRight: 2
@@ -6058,7 +6259,8 @@ const MobileTeam = ({
   votes,
   showToast,
   onSeason,
-  setNavTitle
+  setNavTitle,
+  intro
 }) => {
   const a = slotsFromBoard(board);
   const [picker, setPicker] = useState(null);
@@ -6182,7 +6384,9 @@ const MobileTeam = ({
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
     gap: 8
   };
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(LargeTitle, {
+  return /*#__PURE__*/React.createElement("div", {
+    className: intro ? 'm-stagger' : undefined
+  }, /*#__PURE__*/React.createElement(LargeTitle, {
     title: "Best 23",
     subtitle: `${S_YEAR} season · ${selected.length} of 23 picked`,
     onSeason: onSeason
@@ -6424,12 +6628,85 @@ const RANK_COLORS = {
 };
 // One distinct colour per vote (the desktop's scoreColors share amber for 1 and 2)
 const VOTE_COLORS = ['#ff6b6b', '#ff9f43', '#ffd166', '#4cd964', '#60a5fa'];
+
+// The 0-4 control. Changing a vote slides the coloured thumb across (it's moving on screen);
+// a first vote fades in on the spot from 0.9 scale, never from nothing.
+const VoteBar = ({
+  score,
+  name,
+  onPick
+}) => {
+  const has = score !== undefined && score !== null;
+  const prev = useRef({
+    has,
+    at: has ? score : 2
+  });
+  const at = has ? score : prev.current.at;
+  const slide = has && prev.current.has && !REDUCED_MOTION;
+  useEffect(() => {
+    prev.current = {
+      has,
+      at
+    };
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'relative',
+      display: 'grid',
+      gridTemplateColumns: 'repeat(5, 1fr)',
+      padding: 2,
+      marginTop: 10,
+      borderRadius: 10,
+      background: M.fill
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    "aria-hidden": "true",
+    style: {
+      position: 'absolute',
+      top: 2,
+      bottom: 2,
+      left: 2,
+      width: 'calc((100% - 4px) / 5)',
+      transform: `translateX(${at * 100}%)`,
+      transition: slide ? `transform 220ms ${EASE_OUT}` : 'none'
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'block',
+      height: '100%',
+      borderRadius: 8,
+      background: VOTE_COLORS[at],
+      boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+      opacity: has ? 1 : 0,
+      transform: has || REDUCED_MOTION ? 'none' : 'scale(0.9)',
+      transition: `opacity 150ms ease, transform 180ms ${EASE_OUT}, background-color 200ms ease`
+    }
+  })), [0, 1, 2, 3, 4].map(s => /*#__PURE__*/React.createElement("button", {
+    key: s,
+    onClick: () => onPick(s),
+    "aria-label": `${s} votes for ${name}`,
+    style: {
+      position: 'relative',
+      height: 40,
+      borderRadius: 8,
+      border: 'none',
+      cursor: 'pointer',
+      fontFamily: 'inherit',
+      background: 'transparent',
+      color: has && score === s ? '#07101f' : 'rgba(255,255,255,0.7)',
+      fontSize: 17,
+      fontWeight: 600,
+      transition: `color 150ms ease, transform 160ms ${EASE_OUT}`
+    }
+  }, s)));
+};
 const MobileVotes = ({
   votes,
   setVotes,
   ratings,
   onSeason,
-  setNavTitle
+  setNavTitle,
+  intro
 }) => {
   const playable = S_FIXTURE.filter(g => g.opponent !== 'BYE');
   const playedIn = r => Object.entries(ratings[r] || {}).filter(([, d]) => d && d.rating !== null && d.rating !== undefined).map(([id, d]) => ({
@@ -6497,7 +6774,7 @@ const MobileVotes = ({
         sr = sc.getBoundingClientRect();
       sc.scrollTo({
         top: sc.scrollTop + (r.top - sr.top) - (sc.clientHeight - r.height) / 2,
-        behavior: 'smooth'
+        behavior: REDUCED_MOTION ? 'auto' : 'smooth'
       });
     }, 140);
   };
@@ -6540,7 +6817,9 @@ const MobileVotes = ({
       lineHeight: 1
     }
   }, score));
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(LargeTitle, {
+  return /*#__PURE__*/React.createElement("div", {
+    className: intro ? 'm-stagger' : undefined
+  }, /*#__PURE__*/React.createElement(LargeTitle, {
     title: "B&F votes",
     subtitle: `${S_YEAR} season · ${doneRounds} of ${ratedRounds.length} rounds voted`,
     onSeason: onSeason
@@ -6556,6 +6835,7 @@ const MobileVotes = ({
     title: "No votes yet",
     text: "Votes you give each round add up here."
   }) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "m-stagger",
     style: {
       display: 'grid',
       gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
@@ -6664,7 +6944,7 @@ const MobileVotes = ({
       color: M.text2,
       fontSize: 13
     }
-  }, x.games, " gm · ", (x.total / x.games).toFixed(2), " avg")), /*#__PURE__*/React.createElement("span", {
+  }, x.games, " gm \xB7 ", (x.total / x.games).toFixed(2), " avg")), /*#__PURE__*/React.createElement("span", {
     style: {
       fontFamily: OSWALD,
       fontSize: 22,
@@ -6789,10 +7069,11 @@ const MobileVotes = ({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       height: '100%',
-      width: `${Math.min(100, scored / target * 100)}%`,
-      background: scored >= target ? M.green : '#fff',
+      width: '100%',
       borderRadius: 3,
-      transition: 'width 0.3s ease'
+      background: scored >= target ? M.green : '#fff',
+      transform: `translateX(${Math.min(100, scored / target * 100) - 100}%)`,
+      transition: `transform 300ms ${EASE_OUT}, background-color 200ms ease`
     }
   })))), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6801,7 +7082,7 @@ const MobileVotes = ({
       textAlign: 'center',
       margin: '14px 0 4px'
     }
-  }, "0 poor · 1 OK · 2 good · 3 very good · 4 best on ground"), !played.length && /*#__PURE__*/React.createElement("div", {
+  }, "0 poor \xB7 1 OK \xB7 2 good \xB7 3 very good \xB7 4 best on ground"), !played.length && /*#__PURE__*/React.createElement("div", {
     style: {
       color: M.text2,
       fontSize: 14,
@@ -6866,34 +7147,11 @@ const MobileVotes = ({
         color: rating >= 15 ? '#4cd964' : rating >= 8 ? M.warn : M.text2,
         fontWeight: 600
       }
-    }, rating.toFixed(1)), tog ? ` · ${Math.round(tog)}% game time` : ''))), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        gap: 2,
-        padding: 2,
-        marginTop: 10,
-        borderRadius: 11,
-        background: M.fill
-      }
-    }, [0, 1, 2, 3, 4].map(s => /*#__PURE__*/React.createElement("button", {
-      key: s,
-      onClick: () => setScore(p.id, s),
-      "aria-label": `${s} votes for ${p.name}`,
-      style: {
-        flex: 1,
-        height: 40,
-        borderRadius: 9,
-        border: 'none',
-        cursor: 'pointer',
-        fontFamily: 'inherit',
-        background: score === s ? VOTE_COLORS[s] : 'transparent',
-        color: score === s ? '#07101f' : 'rgba(255,255,255,0.7)',
-        fontSize: 17,
-        fontWeight: score === s ? 700 : 500,
-        boxShadow: score === s ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
-        transition: 'background 0.15s ease, color 0.15s ease'
-      }
-    }, s)))));
+    }, rating.toFixed(1)), tog ? ` · ${Math.round(tog)}% game time` : ''))), /*#__PURE__*/React.createElement(VoteBar, {
+      score: score,
+      name: p.name,
+      onPick: s => setScore(p.id, s)
+    })));
   }), played.length > 0 && /*#__PURE__*/React.createElement(MButton, {
     onClick: () => setShowAll(!showAll),
     style: {
@@ -6914,12 +7172,14 @@ const MenuRow = ({
   first
 }) => /*#__PURE__*/React.createElement("button", {
   onClick: onClick,
+  className: "m-row",
   style: {
     width: '100%',
     display: 'flex',
     alignItems: 'center',
     gap: 12,
     padding: '11px 14px',
+    borderRadius: 0,
     background: 'transparent',
     border: 'none',
     borderTop: first ? 'none' : `1px solid ${M.sep}`,
@@ -7006,10 +7266,18 @@ function MobileApp({
   const {
     toast,
     showToast,
-    runUndo
+    runUndo,
+    dismissToast
   } = useUndoToast();
   const sync = useVoteSync(votes, setVotes);
   const [syncOpen, setSyncOpen] = useState(false);
+  // The rise-in stagger plays once, when the app opens. Tabs are hidden with display:none, and
+  // CSS animations restart when an element is shown again, so the class comes off after a second.
+  const [intro, setIntro] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setIntro(false), 1000);
+    return () => clearTimeout(t);
+  }, []);
   useEffect(() => {
     try {
       localStorage.setItem('carlton-mobile-tab', tab);
@@ -7077,7 +7345,7 @@ function MobileApp({
   const pickTab = k => {
     if (k === tab && scrollRefs.current[k]) scrollRefs.current[k].scrollTo({
       top: 0,
-      behavior: 'smooth'
+      behavior: REDUCED_MOTION ? 'auto' : 'smooth'
     });
     setTab(k);
   };
@@ -7121,12 +7389,14 @@ function MobileApp({
   // iPhones then shift the page and taps land above the finger (28 Oct 2026). The strip shows
   // the page's navy base colour (see the HTML) instead.
   return /*#__PURE__*/React.createElement("div", {
+    className: "m-shell",
     style: {
       position: 'fixed',
       inset: 0,
       fontFamily: M.font,
       color: '#fff',
-      WebkitFontSmoothing: 'antialiased'
+      WebkitFontSmoothing: 'antialiased',
+      fontVariantNumeric: 'tabular-nums'
     }
   }, [['team', /*#__PURE__*/React.createElement(MobileTeam, {
     board: board,
@@ -7134,13 +7404,15 @@ function MobileApp({
     votes: votes,
     showToast: showToast,
     onSeason: onSeason,
-    setNavTitle: titleSetter('team')
+    setNavTitle: titleSetter('team'),
+    intro: intro
   })], ['bf', /*#__PURE__*/React.createElement(MobileVotes, {
     votes: votes,
     setVotes: setVotes,
     ratings: ratings,
     onSeason: onSeason,
-    setNavTitle: titleSetter('bf')
+    setNavTitle: titleSetter('bf'),
+    intro: intro
   })]].map(([k, el]) => /*#__PURE__*/React.createElement("div", {
     key: k,
     "data-scroller": "",
@@ -7195,7 +7467,8 @@ function MobileApp({
       textOverflow: 'ellipsis',
       opacity: isScrolled ? 1 : 0,
       transform: isScrolled ? 'none' : 'translateY(4px)',
-      transition: 'opacity 0.2s ease, transform 0.2s ease'
+      filter: isScrolled ? 'blur(0)' : 'blur(3px)',
+      transition: `opacity 200ms ease, transform 200ms ${EASE_OUT}, filter 200ms ease`
     }
   }, navTitles[tab]), /*#__PURE__*/React.createElement("span", {
     style: {
@@ -7261,8 +7534,10 @@ function MobileApp({
       pointerEvents: 'none'
     }
   }, /*#__PURE__*/React.createElement(ToastPill, {
+    big: true,
     toast: toast,
-    onUndo: runUndo
+    onUndo: runUndo,
+    onDismiss: dismissToast
   })), menu && /*#__PURE__*/React.createElement(Sheet, {
     title: "More",
     onClose: () => setMenu(false)
@@ -7357,4 +7632,4 @@ function Root() {
     onSeason: switchSeason
   });
 }
-ReactDOM.createRoot(document.getElementById('root')).render( /*#__PURE__*/React.createElement(Root, null));
+ReactDOM.createRoot(document.getElementById('root')).render(/*#__PURE__*/React.createElement(Root, null));

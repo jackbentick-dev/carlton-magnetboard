@@ -15,6 +15,16 @@
 
     const { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo } = React;
 
+    // Motion tokens, after Emil Kowalski's design-engineering rules (the HTML's CSS has the same
+    // curves): ease-out for anything entering, leaving or answering a press; never ease-in; plain
+    // `ease` only for colour changes; UI motion under 300ms (sheets up to 450ms); transform and
+    // opacity only; transitions rather than keyframes wherever a tap can interrupt.
+    const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
+    const EASE_DRAWER = 'cubic-bezier(0.32, 0.72, 0, 1)';
+    const REDUCED_MOTION = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Buttons that change colour: name the properties (never `all`) and keep the press squeeze
+    const BTN_T = `background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 160ms ${EASE_OUT}`;
+
     const calculateAge = (dob) => {
       const birth = new Date(dob);
       const today = new Date(`${S_YEAR}-01-31`);
@@ -89,6 +99,7 @@
 
     const PlayerPhoto = ({ player, size = 36 }) => {
       const [, bump] = useState(0);
+      const [ready, setReady] = useState(null);   // { src, fade }: which source has loaded, and whether to fade
       const local = player.number == null ? [] : PHOTO_EXTS.map(ext => `players/${player.number}.${ext}`);
       const cdn = PLAYER_PHOTOS[player.number] ? [PLAYER_PHOTOS[player.number]] : [];
       const src = (LOCAL_PHOTOS_FIRST ? [...local, ...cdn] : [...cdn, ...local]).find(s => !deadPhotoSrc.has(s));
@@ -119,13 +130,20 @@
           flexShrink: 0, overflow: 'hidden',
         }}>
           <img
+            key={src}
+            ref={(el) => { if (el && el.complete && el.naturalWidth && !(ready && ready.src === src)) setReady({ src, fade: false }); }}
             src={src}
             alt={player.name}
             loading="lazy"
             decoding="async"
             draggable={false}
+            onLoad={() => setReady(r => (r && r.src === src ? r : { src, fade: true }))}
             onError={() => { deadPhotoSrc.add(src); bump(n => n + 1); }}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center' }}
+            style={{
+              width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center',
+              opacity: ready && ready.src === src ? 1 : 0,
+              transition: ready && ready.src === src && ready.fade ? 'opacity 200ms ease' : 'none',
+            }}
           />
         </div>
       );
@@ -504,7 +522,7 @@
                 color: hasRatings ? '#22c55e' : 'rgba(255,255,255,0.5)',
                 cursor: 'pointer',
                 fontWeight: '700',
-                transition: 'all 0.15s ease',
+                transition: BTN_T,
               }}
             >{hasRatings ? '✓ Wheelo' : '+ Wheelo'}</button>
           </div>
@@ -551,7 +569,7 @@
                     fontSize: '10px',
                     fontWeight: '700',
                     cursor: 'pointer',
-                    transition: 'transform 0.1s ease',
+                    transition: `transform 160ms ${EASE_OUT}`,
                   }}
                 >Import</button>
                 <button
@@ -586,7 +604,7 @@
                   fontSize: '11px',
                   fontWeight: '700',
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease',
+                  transition: BTN_T,
                 }}
               >{v === 'vote' ? 'Vote' : v === 'leaderboard' ? 'Leaderboard' : 'Race'}</button>
             ))}
@@ -711,7 +729,7 @@
                               fontSize: '12px',
                               fontWeight: '700',
                               cursor: 'pointer',
-                              transition: 'all 0.1s ease',
+                              transition: BTN_T,
                             }}
                           >{s}</button>
                         ))}
@@ -975,10 +993,10 @@
                     </>
                   ) : (
                     <div style={{
-                      height: '100%', borderRadius: '3px',
-                      width: `${(p.value / maxVal) * 100}%`,
+                      height: '100%', borderRadius: '3px', width: '100%',
+                      transform: `translateX(${(p.value / maxVal) * 100 - 100}%)`,
                       background: `linear-gradient(90deg, ${statDef.color}88, ${statDef.color})`,
-                      transition: 'width 0.3s ease',
+                      transition: `transform 250ms ${EASE_OUT}`,
                     }} />
                   )}
                 </div>
@@ -1253,7 +1271,7 @@
                   fontSize: '11px',
                   fontWeight: '700',
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease',
+                  transition: BTN_T,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1636,7 +1654,7 @@
                       border: filter === key ? 'none' : '1px solid rgba(255,255,255,0.08)',
                       borderRadius: '8px',
                       fontSize: '10px', fontWeight: '700', cursor: 'pointer',
-                      transition: 'all 0.15s ease',
+                      transition: BTN_T,
                       boxShadow: filter === key ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
                     }}
                   >{pos}</button>
@@ -1694,26 +1712,14 @@
                     onDragStart={(e) => onDragStart(e, player)}
                     onPointerDown={(e) => onPointerStart && onPointerStart(e, player, 'sidebar')}
                     onClick={(e) => onOpenCard && onOpenCard(e, player)}
+                    className="side-row"
                     style={{
-                      background: 'rgba(255,255,255,0.04)',
                       borderRadius: '12px',
                       padding: '12px 14px',
                       marginBottom: '8px',
                       cursor: 'grab',
                       touchAction: 'pan-y',
                       display: 'flex', alignItems: 'center', gap: '12px',
-                      transition: 'all 0.15s ease',
-                      border: '1px solid transparent',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
-                      e.currentTarget.style.transform = 'translateX(4px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
-                      e.currentTarget.style.borderColor = 'transparent';
-                      e.currentTarget.style.transform = 'translateX(0)';
                     }}
                   >
                     <PlayerPhoto player={player} size={44} />
@@ -1867,7 +1873,10 @@
         if (left + w > window.innerWidth - pad) left = rect.left - w - gap;
         left = Math.max(pad, Math.min(window.innerWidth - w - pad, left));
         const top = Math.max(pad, Math.min(window.innerHeight - h - pad, rect.top));
-        setPos({ left, top });
+        // Origin-aware: it scales in from the side facing what was clicked, at that height
+        const originX = left < rect.left ? w : 0;
+        const originY = Math.round(Math.max(0, Math.min(h, rect.top + rect.height / 2 - top)));
+        setPos({ left, top, origin: `${originX}px ${originY}px` });
       }, [rect, player.id]);
 
       useEffect(() => {
@@ -1898,7 +1907,7 @@
           background: `linear-gradient(160deg, ${CARLTON_NAVY_LIGHT} 0%, ${CARLTON_NAVY} 55%, ${CARLTON_NAVY_DARK} 100%)`,
           border: '1px solid rgba(255,255,255,0.14)', borderRadius: '16px',
           boxShadow: '0 24px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08)',
-          padding: '14px', animation: 'float-in 0.16s ease',
+          padding: '14px', animation: `pop-in 150ms ${EASE_OUT}`, transformOrigin: pos.origin || 'center',
         }}>
           <button onClick={onClose} title="Close (Esc)" style={{
             position: 'absolute', top: '10px', right: '10px', width: '24px', height: '24px',
@@ -1943,50 +1952,125 @@
       } catch { return S_SEEDS(); }
     };
 
-    // Undo toast (clear, remove). ⌘Z/Ctrl+Z undoes while it's showing.
+    // Undo toast (clear, remove). ⌘Z/Ctrl+Z undoes while it's showing. Built on the rules behind
+    // Emil Kowalski's Sonner: transitions rather than keyframes so it can be interrupted; it leaves
+    // the way it came (up from the bottom, swipe down to dismiss); out faster than in; and the
+    // timer pauses while the app is in the background.
+    const TOAST_MS = 8000;
     const useUndoToast = () => {
       const [toast, setToast] = useState(null);
-      const timer = useRef(null);
-      const showToast = (msg, undo) => {
+      const timer = useRef(null), gone = useRef(null), left = useRef(0), since = useRef(0);
+      const live = useRef(null);
+      live.current = toast;
+      // instant = no exit animation, for the keyboard (keyboard actions never animate)
+      const dismiss = (instant) => {
         clearTimeout(timer.current);
-        setToast({ msg, undo, id: Date.now() });
-        timer.current = setTimeout(() => setToast(null), 8000);
+        clearTimeout(gone.current);
+        if (instant === true) { setToast(null); return; }
+        setToast(t => (t ? { ...t, leaving: true } : t));
+        gone.current = setTimeout(() => setToast(null), 220);
       };
-      const runUndo = () => {
-        if (toast && toast.undo) toast.undo();
+      const arm = (ms) => {
         clearTimeout(timer.current);
-        setToast(null);
+        left.current = ms;
+        since.current = Date.now();
+        timer.current = setTimeout(dismiss, ms);
+      };
+      const showToast = (msg, undo) => {
+        clearTimeout(gone.current);
+        setToast({ msg, undo, id: Date.now() });
+        arm(TOAST_MS);
+      };
+      const runUndo = (instant) => {
+        if (toast && toast.undo && !toast.leaving) toast.undo();
+        dismiss(instant === true);
       };
       useEffect(() => {
-        if (!toast || !toast.undo) return;
+        if (!toast || !toast.undo || toast.leaving) return;
         const key = (e) => {
-          if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !isTyping(e.target)) { e.preventDefault(); runUndo(); }
+          if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !isTyping(e.target)) { e.preventDefault(); runUndo(true); }
         };
         window.addEventListener('keydown', key);
         return () => window.removeEventListener('keydown', key);
       }, [toast]);
-      return { toast, showToast, runUndo };
+      useEffect(() => {
+        const vis = () => {
+          if (!live.current || live.current.leaving) return;
+          if (document.visibilityState === 'hidden') {
+            clearTimeout(timer.current);
+            left.current = Math.max(2000, left.current - (Date.now() - since.current));
+          } else arm(left.current);
+        };
+        document.addEventListener('visibilitychange', vis);
+        return () => {
+          document.removeEventListener('visibilitychange', vis);
+          clearTimeout(timer.current);
+          clearTimeout(gone.current);
+        };
+      }, []);
+      return { toast, showToast, runUndo, dismissToast: dismiss };
     };
 
-    const ToastPill = ({ toast, onUndo }) => (
-      <div key={toast.id} style={{
-        pointerEvents: 'auto', animation: 'float-in 0.18s ease',
-        display: 'flex', alignItems: 'center', gap: '14px',
-        padding: '9px 10px 9px 16px',
-        background: 'rgba(13,28,54,0.97)', border: '1px solid rgba(255,255,255,0.16)',
-        borderRadius: '12px', boxShadow: '0 16px 40px rgba(0,0,0,0.55)',
-        color: '#fff', fontSize: '12.5px', fontWeight: '600',
-      }}>
-        {toast.msg}
-        {toast.undo && (
-          <button onClick={onUndo} title="Undo (⌘Z)" style={{
-            padding: '6px 12px', borderRadius: '8px', cursor: 'pointer',
-            background: 'rgba(96,165,250,0.15)', border: '1px solid rgba(96,165,250,0.35)',
-            color: '#60a5fa', fontSize: '12px', fontWeight: '800',
-          }}>Undo</button>
-        )}
-      </div>
-    );
+    const TOAST_IN = 'transform 400ms ease, opacity 400ms ease';
+    const TOAST_OUT = `transform 200ms ${EASE_OUT}, opacity 200ms ease`;
+    const ToastPill = ({ toast, onUndo, onDismiss, big }) => {
+      const ref = useRef(null);
+      const drag = useRef(null);
+      const [shown, setShown] = useState(false);
+      useEffect(() => {
+        const r = requestAnimationFrame(() => setShown(true));
+        return () => cancelAnimationFrame(r);
+      }, []);
+      const out = !shown || !!toast.leaving;
+      const transition = toast.leaving ? TOAST_OUT : TOAST_IN;
+
+      // Swipe down to dismiss. The pill follows the finger directly (no React state per move);
+      // a short flick is enough (speed, not just distance); upwards it resists rather than stops.
+      const down = (e) => {
+        if (drag.current || toast.leaving || e.target.closest('button')) return;   // one finger at a time
+        drag.current = { id: e.pointerId, y: e.clientY, t: Date.now(), dy: 0 };
+        ref.current.style.transition = 'none';
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+      };
+      const move = (e) => {
+        const d = drag.current;
+        if (!d || e.pointerId !== d.id) return;
+        const raw = e.clientY - d.y;
+        d.dy = raw >= 0 ? raw : -Math.pow(-raw, 0.6);
+        ref.current.style.transform = `translateY(${d.dy}px)`;
+      };
+      const up = (e) => {
+        const d = drag.current;
+        if (!d || e.pointerId !== d.id) return;
+        drag.current = null;
+        const speed = Math.abs(d.dy) / Math.max(1, Date.now() - d.t);
+        ref.current.style.transition = transition;
+        if (d.dy > 4 && (d.dy >= 36 || speed > 0.11) && onDismiss) onDismiss();
+        else ref.current.style.transform = 'translateY(0)';
+      };
+
+      return (
+        <div ref={ref} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} style={{
+          pointerEvents: toast.leaving ? 'none' : 'auto', touchAction: 'none',
+          transform: out && !REDUCED_MOTION ? 'translateY(calc(100% + 24px))' : 'translateY(0)',
+          opacity: out ? 0 : 1, transition,
+          display: 'flex', alignItems: 'center', gap: '14px',
+          padding: big ? '10px 10px 10px 18px' : '9px 10px 9px 16px',
+          background: 'rgba(13,28,54,0.97)', border: '1px solid rgba(255,255,255,0.16)',
+          borderRadius: big ? '14px' : '12px', boxShadow: '0 16px 40px rgba(0,0,0,0.55)',
+          color: '#fff', fontSize: big ? '15px' : '12.5px', fontWeight: '600',
+        }}>
+          {toast.msg}
+          {toast.undo && (
+            <button onClick={onUndo} title="Undo (⌘Z)" style={{
+              padding: big ? '8px 14px' : '6px 12px', borderRadius: '8px', cursor: 'pointer',
+              background: 'rgba(96,165,250,0.15)', border: '1px solid rgba(96,165,250,0.35)',
+              color: '#60a5fa', fontSize: big ? '15px' : '12px', fontWeight: '800',
+            }}>Undo</button>
+          )}
+        </div>
+      );
+    };
 
     // Team balance: talls = non-midfielders 193cm+ (rucks included)
     const teamBalance = (selected, fieldCount) => {
@@ -2539,27 +2623,37 @@
       );
     };
 
-    // Centred dialog for the desktop board
+    // Centred dialog for the desktop board. It scales in from the centre (a dialog isn't anchored to
+    // what opened it, unlike a popover) and leaves faster than it arrives. Escape closes it at once:
+    // keyboard actions never animate.
     const Modal = ({ title, onClose, children }) => {
+      const [closing, setClosing] = useState(false);
+      const close = () => {
+        if (closing) return;
+        setClosing(true);
+        setTimeout(onClose, 150);
+      };
       useEffect(() => {
         const key = (e) => { if (e.key === 'Escape') onClose(); };
         window.addEventListener('keydown', key);
         return () => window.removeEventListener('keydown', key);
       }, [onClose]);
       return (
-        <div onClick={onClose} style={{
+        <div onClick={close} style={{
           position: 'fixed', inset: 0, zIndex: 4000, background: 'rgba(2,6,14,0.6)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'fade-in 0.15s ease',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'fade-in 150ms ease',
+          opacity: closing ? 0 : 1, transition: 'opacity 150ms ease',
         }}>
           <div onClick={(e) => e.stopPropagation()} style={{
             width: '460px', maxWidth: 'calc(100% - 32px)', padding: '20px 22px 22px',
             background: `linear-gradient(160deg, ${CARLTON_NAVY_LIGHT} 0%, ${CARLTON_NAVY} 55%, ${CARLTON_NAVY_DARK} 100%)`,
             border: '1px solid rgba(255,255,255,0.14)', borderRadius: '18px',
-            boxShadow: '0 30px 80px rgba(0,0,0,0.6)', animation: 'float-in 0.18s ease',
+            boxShadow: '0 30px 80px rgba(0,0,0,0.6)', animation: `pop-in 200ms ${EASE_OUT}`,
+            transform: closing ? 'scale(0.97)' : 'none', transition: `transform 150ms ${EASE_OUT}`,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
               <span style={{ color: '#fff', fontSize: '18px', fontWeight: '800' }}>{title}</span>
-              <button onClick={onClose} style={{
+              <button onClick={close} style={{
                 padding: '6px 13px', borderRadius: '999px', border: 'none', cursor: 'pointer',
                 background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: '13px', fontWeight: '700',
               }}>Done</button>
@@ -2604,7 +2698,7 @@
       const onFieldCount = Object.keys(fieldPlayers).length - interchangeCount;
 
       // --- Undo toast (clear board, remove player) ---
-      const { toast, showToast, runUndo } = useUndoToast();
+      const { toast, showToast, runUndo, dismissToast } = useUndoToast();
 
       // --- Vote sync with the phone ---
       const sync = useVoteSync(votes, setVotes);
@@ -2896,52 +2990,44 @@
                 title="Take every player off the board (you can undo)"
                 style={{
                   padding: '10px 13px',
-                  background: 'rgba(239,68,68,0.1)', color: '#f87171',
+                  '--tb': 'rgba(239,68,68,0.1)', '--tb-hover': 'rgba(239,68,68,0.2)', color: '#f87171',
                   border: '1px solid rgba(239,68,68,0.25)', borderRadius: '10px',
                   cursor: 'pointer', fontSize: '12px', fontWeight: '700',
-                  transition: 'all 0.15s ease',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
+                className="tb"
               >✕ Clear board</button>
               <button
                 onClick={exportBackup}
                 title="Download all votes, ratings and the board layout as a JSON file"
                 style={{
                   padding: '10px 13px',
-                  background: 'rgba(59,130,246,0.1)', color: '#60a5fa',
+                  '--tb': 'rgba(59,130,246,0.1)', '--tb-hover': 'rgba(59,130,246,0.2)', color: '#60a5fa',
                   border: '1px solid rgba(59,130,246,0.25)', borderRadius: '10px',
                   cursor: 'pointer', fontSize: '12px', fontWeight: '700',
-                  transition: 'all 0.15s ease',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(59,130,246,0.2)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(59,130,246,0.1)'; }}
+                className="tb"
               >⭳ Backup</button>
               <button
                 onClick={exportTeamSheet}
                 title="Export the current board as a classic team-sheet PNG (lines read top-to-bottom off the board)"
                 style={{
                   padding: '10px 13px',
-                  background: 'rgba(34,197,94,0.1)', color: '#4ade80',
+                  '--tb': 'rgba(34,197,94,0.1)', '--tb-hover': 'rgba(34,197,94,0.2)', color: '#4ade80',
                   border: '1px solid rgba(34,197,94,0.25)', borderRadius: '10px',
                   cursor: 'pointer', fontSize: '12px', fontWeight: '700',
-                  transition: 'all 0.15s ease',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(34,197,94,0.2)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(34,197,94,0.1)'; }}
+                className="tb"
               >⭳ Team sheet</button>
               <button
                 onClick={() => fileInputRef.current && fileInputRef.current.click()}
                 title="Restore votes, ratings and board layout from a backup file"
                 style={{
                   padding: '10px 13px',
-                  background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)',
+                  '--tb': 'rgba(255,255,255,0.05)', '--tb-hover': 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)',
                   border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px',
                   cursor: 'pointer', fontSize: '12px', fontWeight: '700',
-                  transition: 'all 0.15s ease',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                className="tb"
               >⭱ Restore</button>
               <button
                 onClick={() => setSyncOpen(true)}
@@ -3117,7 +3203,7 @@
                           cursor: 'grab',
                           touchAction: 'none',
                           position: 'relative',
-                          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                          transition: `transform 160ms ${EASE_OUT}, box-shadow 150ms ease`,
                           boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
                         }}
                       >
@@ -3216,7 +3302,7 @@
               position: 'fixed', left: '452px', right: '316px', bottom: '104px', zIndex: 2500,
               display: 'flex', justifyContent: 'center', pointerEvents: 'none',
             }}>
-              <ToastPill toast={toast} onUndo={runUndo} />
+              <ToastPill toast={toast} onUndo={runUndo} onDismiss={dismissToast} />
             </div>
           )}
 
@@ -3323,7 +3409,7 @@
     );
 
     const IconButton = ({ icon, label, onClick, badge, disabled, size = 38 }) => (
-      <button onClick={onClick} aria-label={label} disabled={disabled} style={{
+      <button onClick={onClick} aria-label={label} disabled={disabled} className="m-hit" style={{
         position: 'relative', width: size, height: size, borderRadius: size / 2, flexShrink: 0,
         border: 'none', background: M.fill, color: '#fff', cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.3 : 1,
@@ -3338,20 +3424,31 @@
       </button>
     );
 
-    // iOS-style segmented control: white thumb with navy text on the active segment
-    const Segmented = ({ options, value, onChange, small, style }) => (
-      <div style={{ display: 'flex', padding: 2, gap: 2, borderRadius: 10, background: M.fill, ...style }}>
-        {options.map(([k, label]) => (
-          <button key={k} onClick={() => onChange(k)} style={{
-            flex: 1, padding: small ? '5px 11px' : '7px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: value === k ? '#fff' : 'transparent', color: value === k ? CARLTON_NAVY : 'rgba(255,255,255,0.78)',
-            boxShadow: value === k ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
-            fontSize: small ? 13 : 14, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap',
-            transition: 'background 0.18s ease, color 0.18s ease',
-          }}>{label}</button>
-        ))}
-      </div>
-    );
+    // iOS-style segmented control: one white thumb that slides to the chosen option (it's moving on
+    // screen, so it travels rather than blinking between two places). Equal columns keep it lined up.
+    const Segmented = ({ options, value, onChange, small, style }) => {
+      const at = Math.max(0, options.findIndex(([k]) => k === value));
+      return (
+        <div style={{
+          position: 'relative', display: 'grid', gridTemplateColumns: `repeat(${options.length}, 1fr)`,
+          padding: 2, borderRadius: 10, background: M.fill, ...style,
+        }}>
+          <span aria-hidden="true" style={{
+            position: 'absolute', top: 2, bottom: 2, left: 2, width: `calc((100% - 4px) / ${options.length})`,
+            borderRadius: 8, background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+            transform: `translateX(${at * 100}%)`, transition: REDUCED_MOTION ? 'none' : `transform 250ms ${EASE_OUT}`,
+          }}></span>
+          {options.map(([k, label]) => (
+            <button key={k} className="m-seg" onClick={() => onChange(k)} style={{
+              position: 'relative', padding: small ? '5px 11px' : '7px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: 'transparent', color: value === k ? CARLTON_NAVY : 'rgba(255,255,255,0.78)',
+              fontSize: small ? 13 : 14, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap',
+              transition: `color 200ms ease, transform 160ms ${EASE_OUT}`,
+            }}>{label}</button>
+          ))}
+        </div>
+      );
+    };
 
     const MButton = ({ children, onClick, kind = 'secondary', icon, style, disabled }) => (
       <button onClick={onClick} disabled={disabled} style={{
@@ -3368,7 +3465,7 @@
     );
 
     const Card = ({ children, style }) => (
-      <div style={{ background: M.card, border: `1px solid ${M.sep}`, borderRadius: 18, ...style }}>{children}</div>
+      <div style={{ background: M.card, border: `1px solid ${M.sep}`, borderRadius: 22, ...style }}>{children}</div>
     );
 
     const SectionHeader = ({ children, right }) => (
@@ -3406,7 +3503,7 @@
           <Icon name={icon} size={28} />
         </div>
         <div style={{ fontSize: 17, fontWeight: 600 }}>{title}</div>
-        <div style={{ color: M.text2, fontSize: 15, marginTop: 6, lineHeight: 1.45 }}>{text}</div>
+        <div className="m-balance" style={{ color: M.text2, fontSize: 15, marginTop: 6, lineHeight: 1.45 }}>{text}</div>
       </Card>
     );
 
@@ -3417,7 +3514,7 @@
           <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }} aria-hidden="true">
             <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="5" />
             <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={done ? M.green : '#fff'} strokeWidth="5" strokeLinecap="round"
-              strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(1, value / max))} style={{ transition: 'stroke-dashoffset 0.4s ease' }} />
+              strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(1, value / max))} style={{ transition: `stroke-dashoffset 300ms ${EASE_OUT}` }} />
           </svg>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: OSWALD, fontSize: 20, fontWeight: 600 }}>{value}</div>
         </div>
@@ -3456,55 +3553,97 @@
     // `pinned` stays above the scrolling part (e.g. the picker's search and filters). Changing
     // `scrollKey` puts the list back at the top. Swipe the top of the sheet down (or tap the
     // backdrop / Done) to close; it slides away rather than vanishing.
+    // How many sheets are open. While any is, the app behind steps back (.m-shell in the CSS).
+    let openSheets = 0;
+    const countSheet = (d) => {
+      openSheets = Math.max(0, openSheets + d);
+      document.documentElement.toggleAttribute('data-sheet-open', openSheets > 0);
+    };
+
+    // Motion, after Emil Kowalski's Vaul drawer: the iOS sheet curve; a transition rather than a
+    // keyframe animation, so a swipe or a tap on Done can interrupt it mid-flight; while dragging,
+    // the panel follows the finger directly (no React render per move); a quick flick closes it
+    // (speed, not just distance); dragging up meets friction instead of a hard stop; and it leaves
+    // faster than it arrives.
     const Sheet = ({ title, onClose, children, pinned, scrollKey }) => {
       const view = useVisibleViewport();
-      const headRef = useRef(null);
-      const bodyRef = useRef(null);
+      const headRef = useRef(null), bodyRef = useRef(null), panelRef = useRef(null), backRef = useRef(null);
       const [headH, setHeadH] = useState(64);
-      const [drag, setDrag] = useState(0);
-      const [dragging, setDragging] = useState(false);
+      const [shown, setShown] = useState(false);
       const [closing, setClosing] = useState(false);
-      const start = useRef(null);
+      const drag = useRef(null);
+      const counted = useRef(false);
       useLayoutEffect(() => { if (headRef.current) setHeadH(headRef.current.offsetHeight); });
       useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = 0; }, [scrollKey]);
+      useEffect(() => {
+        counted.current = true;
+        countSheet(1);
+        let r2;
+        const r1 = requestAnimationFrame(() => { r2 = requestAnimationFrame(() => setShown(true)); });
+        return () => {
+          cancelAnimationFrame(r1);
+          cancelAnimationFrame(r2);
+          if (counted.current) { counted.current = false; countSheet(-1); }
+        };
+      }, []);
       const panelMax = Math.max(240, view.height - 44);
+      const hidden = !shown || closing;
+      const panelT = `transform ${closing ? 300 : 450}ms ${EASE_DRAWER}`;
+      const backT = `opacity ${closing ? 250 : 350}ms ease`;
 
       const close = () => {
         if (closing) return;
         if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+        if (counted.current) { counted.current = false; countSheet(-1); }
         setClosing(true);
-        setTimeout(onClose, 200);
+        setTimeout(onClose, REDUCED_MOTION ? 200 : 300);
       };
       const down = (e) => {
+        if (drag.current || closing || REDUCED_MOTION) return;      // one finger at a time
         if (e.target.closest('input, button, select')) return;
-        start.current = { y: e.clientY, t: performance.now() };
-        setDragging(true);
+        drag.current = { id: e.pointerId, y: e.clientY, t: performance.now(), dy: 0, h: panelRef.current.offsetHeight };
+        panelRef.current.style.transition = 'none';
+        backRef.current.style.transition = 'none';
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
       };
-      const move = (e) => { if (start.current) setDrag(Math.max(0, e.clientY - start.current.y)); };
+      const move = (e) => {
+        const d = drag.current;
+        if (!d || e.pointerId !== d.id) return;
+        const raw = e.clientY - d.y;
+        d.dy = raw >= 0 ? raw : -Math.pow(-raw, 0.6);
+        panelRef.current.style.transform = `translateY(${d.dy}px)`;
+        backRef.current.style.opacity = String(1 - Math.min(1, Math.max(0, d.dy) / d.h) * 0.7);
+      };
       const up = (e) => {
-        if (!start.current) return;
-        const dy = Math.max(0, e.clientY - start.current.y);
-        const speed = dy / Math.max(1, performance.now() - start.current.t);
-        start.current = null;
-        setDragging(false);
-        if (dy > 120 || (dy > 50 && speed > 0.8)) close(); else setDrag(0);
+        const d = drag.current;
+        if (!d || e.pointerId !== d.id) return;
+        drag.current = null;
+        const speed = d.dy / Math.max(1, performance.now() - d.t);   // px per ms, downwards
+        if (d.dy > d.h * 0.25 || (d.dy > 12 && speed > 0.4)) { close(); return; }
+        panelRef.current.style.transition = panelT;
+        panelRef.current.style.transform = 'translateY(0)';
+        backRef.current.style.transition = backT;
+        backRef.current.style.opacity = '1';
       };
 
       return ReactDOM.createPortal(
-        <div onClick={close} style={{
+        <div style={{
           position: 'fixed', left: 0, right: 0, top: view.top, height: view.height, zIndex: 4000,
-          background: 'rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-          fontFamily: M.font, color: '#fff', animation: 'fade-in 0.15s ease',
-          opacity: closing ? 0 : 1 - Math.min(drag / 500, 0.5), transition: 'opacity 0.2s ease',
+          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+          fontFamily: M.font, color: '#fff', fontVariantNumeric: 'tabular-nums',
+          pointerEvents: closing ? 'none' : 'auto',
         }}>
-          <div onClick={(e) => e.stopPropagation()} style={{
-            maxHeight: panelMax, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          <div ref={backRef} onClick={close} style={{
+            position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)',
+            opacity: hidden ? 0 : 1, transition: backT,
+          }}></div>
+          <div ref={panelRef} style={{
+            position: 'relative', maxHeight: panelMax, display: 'flex', flexDirection: 'column', overflow: 'hidden',
             background: '#0e1a30', borderRadius: '22px 22px 0 0',
             boxShadow: '0 -10px 40px rgba(0,0,0,0.45)',
-            animation: 'sheet-up 0.26s cubic-bezier(0.2, 0.8, 0.2, 1)',
-            transform: closing ? 'translateY(100%)' : `translateY(${drag}px)`,
-            transition: dragging ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
+            ...(REDUCED_MOTION
+              ? { opacity: hidden ? 0 : 1, transition: 'opacity 200ms ease' }
+              : { transform: hidden ? 'translateY(100%)' : 'translateY(0)', transition: panelT }),
           }}>
             <div ref={headRef} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
               style={{ flexShrink: 0, touchAction: 'none', cursor: 'grab' }}>
@@ -3514,8 +3653,8 @@
               <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr 64px', alignItems: 'center', padding: '6px 12px 10px' }}>
                 <span></span>
                 <span style={{ textAlign: 'center', fontSize: 17, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</span>
-                <button onClick={close} style={{
-                  justifySelf: 'end', padding: '6px 4px', border: 'none', background: 'transparent', cursor: 'pointer',
+                <button onClick={close} className="m-hit" style={{
+                  position: 'relative', justifySelf: 'end', padding: '6px 4px', border: 'none', background: 'transparent', cursor: 'pointer',
                   color: '#fff', fontSize: 17, fontWeight: 600, fontFamily: 'inherit',
                 }}>Done</button>
               </div>
@@ -3542,7 +3681,8 @@
         border: highlight ? '2px solid #fff' : `1px solid ${player ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.06)'}`,
         boxShadow: highlight ? '0 0 0 4px rgba(255,255,255,0.14)' : 'none',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
-        color: '#fff', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s ease',
+        color: '#fff', cursor: 'pointer', fontFamily: 'inherit',
+        transition: `transform 160ms ${EASE_OUT}, background-color 150ms ease, box-shadow 150ms ease`,
       }}>
         <span style={{ position: 'absolute', top: 7, left: 9, fontSize: 10.5, fontWeight: 600, color: M.text3, letterSpacing: '0.3px' }}>{label}</span>
         {player && player.captain && (
@@ -3632,9 +3772,9 @@
             </div>
           )}
           {avail.map(p => (
-            <button key={p.id} onClick={() => onPick(p.id)} style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0',
-              background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+            <button key={p.id} onClick={() => onPick(p.id)} className="m-row" data-player-row="" style={{
+              width: 'calc(100% + 16px)', margin: '0 -8px', display: 'flex', alignItems: 'center', gap: 12, padding: '9px 8px',
+              background: 'transparent', border: 'none', borderRadius: 12, color: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
             }}>
               <PlayerPhoto player={p} size={44} />
               <span style={{
@@ -3663,7 +3803,7 @@
       );
     };
 
-    const MobileTeam = ({ board, setBoard, votes, showToast, onSeason, setNavTitle }) => {
+    const MobileTeam = ({ board, setBoard, votes, showToast, onSeason, setNavTitle, intro }) => {
       const a = slotsFromBoard(board);
       const [picker, setPicker] = useState(null);
       const [detail, setDetail] = useState(null);
@@ -3734,7 +3874,7 @@
       const grid = { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 };
 
       return (
-        <div>
+        <div className={intro ? 'm-stagger' : undefined}>
           <LargeTitle title="Best 23" subtitle={`${S_YEAR} season · ${selected.length} of 23 picked`} onSeason={onSeason} />
 
           <Card style={{ marginTop: 16, padding: 16 }}>
@@ -3850,7 +3990,40 @@
     // One distinct colour per vote (the desktop's scoreColors share amber for 1 and 2)
     const VOTE_COLORS = ['#ff6b6b', '#ff9f43', '#ffd166', '#4cd964', '#60a5fa'];
 
-    const MobileVotes = ({ votes, setVotes, ratings, onSeason, setNavTitle }) => {
+    // The 0-4 control. Changing a vote slides the coloured thumb across (it's moving on screen);
+    // a first vote fades in on the spot from 0.9 scale, never from nothing.
+    const VoteBar = ({ score, name, onPick }) => {
+      const has = score !== undefined && score !== null;
+      const prev = useRef({ has, at: has ? score : 2 });
+      const at = has ? score : prev.current.at;
+      const slide = has && prev.current.has && !REDUCED_MOTION;
+      useEffect(() => { prev.current = { has, at }; });
+      return (
+        <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', padding: 2, marginTop: 10, borderRadius: 10, background: M.fill }}>
+          <span aria-hidden="true" style={{
+            position: 'absolute', top: 2, bottom: 2, left: 2, width: 'calc((100% - 4px) / 5)',
+            transform: `translateX(${at * 100}%)`, transition: slide ? `transform 220ms ${EASE_OUT}` : 'none',
+          }}>
+            <span style={{
+              display: 'block', height: '100%', borderRadius: 8, background: VOTE_COLORS[at],
+              boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+              opacity: has ? 1 : 0, transform: has || REDUCED_MOTION ? 'none' : 'scale(0.9)',
+              transition: `opacity 150ms ease, transform 180ms ${EASE_OUT}, background-color 200ms ease`,
+            }}></span>
+          </span>
+          {[0, 1, 2, 3, 4].map(s => (
+            <button key={s} onClick={() => onPick(s)} aria-label={`${s} votes for ${name}`} style={{
+              position: 'relative', height: 40, borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              background: 'transparent', color: has && score === s ? '#07101f' : 'rgba(255,255,255,0.7)',
+              fontSize: 17, fontWeight: 600,
+              transition: `color 150ms ease, transform 160ms ${EASE_OUT}`,
+            }}>{s}</button>
+          ))}
+        </div>
+      );
+    };
+
+    const MobileVotes = ({ votes, setVotes, ratings, onSeason, setNavTitle, intro }) => {
       const playable = S_FIXTURE.filter(g => g.opponent !== 'BYE');
       const playedIn = (r) => Object.entries(ratings[r] || {})
         .filter(([, d]) => d && d.rating !== null && d.rating !== undefined)
@@ -3908,7 +4081,7 @@
           const sc = el && el.closest('[data-scroller]');
           if (!sc) return;
           const r = el.getBoundingClientRect(), sr = sc.getBoundingClientRect();
-          sc.scrollTo({ top: sc.scrollTop + (r.top - sr.top) - (sc.clientHeight - r.height) / 2, behavior: 'smooth' });
+          sc.scrollTo({ top: sc.scrollTop + (r.top - sr.top) - (sc.clientHeight - r.height) / 2, behavior: REDUCED_MOTION ? 'auto' : 'smooth' });
         }, 140);
       };
       const roundStatus = (r) => {
@@ -3931,7 +4104,7 @@
       );
 
       return (
-        <div>
+        <div className={intro ? 'm-stagger' : undefined}>
           <LargeTitle title="B&F votes" subtitle={`${S_YEAR} season · ${doneRounds} of ${ratedRounds.length} rounds voted`} onSeason={onSeason} />
           <Segmented options={[['vote', 'Vote'], ['board', 'Leaderboard']]} value={view} onChange={setView} style={{ marginTop: 16 }} />
 
@@ -3940,7 +4113,7 @@
               <EmptyState icon="medal" title="No votes yet" text="Votes you give each round add up here." />
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 16, alignItems: 'end' }}>
+                <div className="m-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 16, alignItems: 'end' }}>
                   {[totals[1], totals[0], totals[2]].map((x, i) => x ? (
                     <Card key={x.player.id} style={{ padding: i === 1 ? '16px 8px 14px' : '12px 8px', textAlign: 'center' }}>
                       <div style={{ position: 'relative', width: i === 1 ? 62 : 52, margin: '0 auto' }}>
@@ -4019,7 +4192,11 @@
                       <span>{Math.round((scored / target) * 100)}%</span>
                     </div>
                     <div style={{ height: 6, borderRadius: 3, background: M.fill, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${Math.min(100, (scored / target) * 100)}%`, background: scored >= target ? M.green : '#fff', borderRadius: 3, transition: 'width 0.3s ease' }}></div>
+                      <div style={{
+                        height: '100%', width: '100%', borderRadius: 3, background: scored >= target ? M.green : '#fff',
+                        transform: `translateX(${Math.min(100, (scored / target) * 100) - 100}%)`,
+                        transition: `transform 300ms ${EASE_OUT}, background-color 200ms ease`,
+                      }}></div>
                     </div>
                   </div>
                 )}
@@ -4052,18 +4229,7 @@
                           )}
                         </span>
                       </div>
-                      <div style={{ display: 'flex', gap: 2, padding: 2, marginTop: 10, borderRadius: 11, background: M.fill }}>
-                        {[0, 1, 2, 3, 4].map(s => (
-                          <button key={s} onClick={() => setScore(p.id, s)} aria-label={`${s} votes for ${p.name}`} style={{
-                            flex: 1, height: 40, borderRadius: 9, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                            background: score === s ? VOTE_COLORS[s] : 'transparent',
-                            color: score === s ? '#07101f' : 'rgba(255,255,255,0.7)',
-                            fontSize: 17, fontWeight: score === s ? 700 : 500,
-                            boxShadow: score === s ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
-                            transition: 'background 0.15s ease, color 0.15s ease',
-                          }}>{s}</button>
-                        ))}
-                      </div>
+                      <VoteBar score={score} name={p.name} onPick={(s) => setScore(p.id, s)} />
                     </Card>
                   </div>
                 );
@@ -4083,8 +4249,8 @@
     // ---- App shell ----
 
     const MenuRow = ({ icon, label, sub, onClick, danger, first }) => (
-      <button onClick={onClick} style={{
-        width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px',
+      <button onClick={onClick} className="m-row" style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 0,
         background: 'transparent', border: 'none', borderTop: first ? 'none' : `1px solid ${M.sep}`,
         color: danger ? '#ff6961' : '#fff', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
       }}>
@@ -4113,9 +4279,13 @@
       const [navTitles, setNavTitles] = useState({ team: 'Best 23', bf: 'B&F votes' });
       const scrollRefs = useRef({});
       const fileRef = useRef(null);
-      const { toast, showToast, runUndo } = useUndoToast();
+      const { toast, showToast, runUndo, dismissToast } = useUndoToast();
       const sync = useVoteSync(votes, setVotes);
       const [syncOpen, setSyncOpen] = useState(false);
+      // The rise-in stagger plays once, when the app opens. Tabs are hidden with display:none, and
+      // CSS animations restart when an element is shown again, so the class comes off after a second.
+      const [intro, setIntro] = useState(true);
+      useEffect(() => { const t = setTimeout(() => setIntro(false), 1000); return () => clearTimeout(t); }, []);
 
       useEffect(() => { try { localStorage.setItem('carlton-mobile-tab', tab); } catch {} }, [tab]);
       // iPhones shift the page to show a focused field or the round wheel and don't always shift
@@ -4153,7 +4323,7 @@
       };
       // Tapping the tab you're already on scrolls it back to the top, as in iPhone apps
       const pickTab = (k) => {
-        if (k === tab && scrollRefs.current[k]) scrollRefs.current[k].scrollTo({ top: 0, behavior: 'smooth' });
+        if (k === tab && scrollRefs.current[k]) scrollRefs.current[k].scrollTo({ top: 0, behavior: REDUCED_MOTION ? 'auto' : 'smooth' });
         setTab(k);
       };
       const clearTeam = () => {
@@ -4179,11 +4349,11 @@
       // iPhones then shift the page and taps land above the finger (28 Oct 2026). The strip shows
       // the page's navy base colour (see the HTML) instead.
       return (
-        <div style={{ position: 'fixed', inset: 0, fontFamily: M.font, color: '#fff', WebkitFontSmoothing: 'antialiased' }}>
+        <div className="m-shell" style={{ position: 'fixed', inset: 0, fontFamily: M.font, color: '#fff', WebkitFontSmoothing: 'antialiased', fontVariantNumeric: 'tabular-nums' }}>
           {/* Both tabs stay mounted, each with its own scroll area under the translucent bars,
               so switching keeps your place */}
-          {[['team', <MobileTeam board={board} setBoard={setBoard} votes={votes} showToast={showToast} onSeason={onSeason} setNavTitle={titleSetter('team')} />],
-            ['bf', <MobileVotes votes={votes} setVotes={setVotes} ratings={ratings} onSeason={onSeason} setNavTitle={titleSetter('bf')} />]].map(([k, el]) => (
+          {[['team', <MobileTeam board={board} setBoard={setBoard} votes={votes} showToast={showToast} onSeason={onSeason} setNavTitle={titleSetter('team')} intro={intro} />],
+            ['bf', <MobileVotes votes={votes} setVotes={setVotes} ratings={ratings} onSeason={onSeason} setNavTitle={titleSetter('bf')} intro={intro} />]].map(([k, el]) => (
             <div key={k} data-scroller="" ref={node => { scrollRefs.current[k] = node; }} onScroll={onScroll(k)} style={{
               position: 'absolute', inset: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
               padding: `calc(${M.navH} + 4px) 16px calc(${M.tabH} + 28px)`,
@@ -4204,7 +4374,8 @@
             <span style={{ display: 'flex', alignItems: 'center' }}><LogoDisc team="Carlton" size={32} /></span>
             <span style={{
               textAlign: 'center', fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              opacity: isScrolled ? 1 : 0, transform: isScrolled ? 'none' : 'translateY(4px)', transition: 'opacity 0.2s ease, transform 0.2s ease',
+              opacity: isScrolled ? 1 : 0, transform: isScrolled ? 'none' : 'translateY(4px)', filter: isScrolled ? 'blur(0)' : 'blur(3px)',
+              transition: `opacity 200ms ease, transform 200ms ${EASE_OUT}, filter 200ms ease`,
             }}>{navTitles[tab]}</span>
             <span style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <IconButton icon="cloud" label={syncLabel(sync.status)} onClick={() => setSyncOpen(true)} badge={sync.status ? syncColor(sync.status) : null} size={36} />
@@ -4233,7 +4404,7 @@
               position: 'fixed', left: 12, right: 12, bottom: `calc(${M.tabH} + 12px)`, zIndex: 3500,
               display: 'flex', justifyContent: 'center', pointerEvents: 'none',
             }}>
-              <ToastPill toast={toast} onUndo={runUndo} />
+              <ToastPill big toast={toast} onUndo={runUndo} onDismiss={dismissToast} />
             </div>
           )}
 

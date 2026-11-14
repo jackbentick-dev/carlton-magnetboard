@@ -26,7 +26,7 @@ npm test             # node --check both files + headless jsdom render of 2026 a
 
 **After any change to `app.src.jsx`, run `npm run build && npm test`.** For data-only changes, run `npm test`. To view the board, open `carlton-magnetboard.html` in a browser.
 
-Jack's Mac had **no Node.js** as at 26 Oct 2026, so `npm` fails there until Node is installed (nodejs.org installer). Without it, the 26 Oct build was done by running Babel standalone 7.23.5 in a browser on `app.src.jsx` with `presets: [['react', { runtime: 'classic', useSpread: true }]]` and `generatorOpts: { jsescOption: { minimal: true } }`. That matches the Node build byte-for-byte except one space. Then the page was clicked through in both seasons by hand. Prefer the real `npm` path once Node exists.
+Node works on Jack's Mac since 31 Oct 2026: Node 24 in `~/.local/bin` (no Homebrew), and `npm install` was run here on 13 Nov 2026, so `npm run build && npm test` is the normal path. `package-lock.json` is committed. Before that, builds were done with Babel standalone in a browser; ignore any older note about that workaround.
 
 ## Architecture
 
@@ -59,7 +59,7 @@ Jack's Mac had **no Node.js** as at 26 Oct 2026, so `npm` fails there until Node
 
 Layout: the middle column is title/toolbar (absolute, top), then a row of `LeftPanel` (420px flex column) + the field column, then the full-width bench strip. The field sizes itself with container-query units (`containerType: 'size'`, `min(100cqh, (100cqw - 120px) * 1.1667)`), leaving room for the FB…FF labels. Don't go back to absolute positioning with `vw` maths; that made the bench and labels sit under the left panel at 1440px.
 
-Board edits: `removePlayer` (all removal paths: double-click, drag back to the list, touch drag off, the card) and `clearBoard` raise an 8-second Undo toast (⌘Z also works). Single click opens the `PlayerCard`. Magnets and bench cards delay it 250ms so a double-click can cancel it.
+Board edits: `removePlayer` (all removal paths: double-click, drag back to the list, touch drag off, the card) and `clearBoard` raise an 8-second Undo toast (⌘Z also works). The toast slides up from the bottom, can be swiped down to dismiss, leaves faster than it arrives, and pauses its timer while the app is in the background (`useUndoToast` returns `dismissToast`). Single click opens the `PlayerCard`. Magnets and bench cards delay it 250ms so a double-click can cancel it.
 
 Shared helpers (above `App`, used by both layouts): `loadJSON`, `loadRatings` (seed versioning), `useUndoToast` + `ToastPill`, `teamBalance`, the team-sheet slot model, `saveTeamSheet` (PNG; share sheet on phones), `teamText`, `downloadBackup`, `restoreBackupFile`.
 
@@ -104,9 +104,25 @@ Finals quirk in 2026: finals were stored as extra rounds (`R25` = Wildcard v Mel
 ## Known gaps / ideas backlog
 Named saved lineups. Injury/unavailable flags. Self-hosted Oswald font for offline use. Real Carlton monogram SVG. A proper finals model. Magnets (min 150px wide) crowd the ground below ~1440px. Sync boards (best 23) too, not just votes. Home-screen icon for the phone. Done 28 Oct 2026: vote sync via gist. Done 26 Oct 2026: quick-find search, undo on clear/remove, player card on click, selection warnings. Done 28 Oct 2026: mobile layout, slot-based team sheet (followers labelled correctly).
 
+## Motion and interaction rules (Emil Kowalski's design engineering)
+Jack asked for these on 13 Nov 2026 ("don't lose the Carlton themes": the navy palette, white-on-navy active states, Oswald numbers and gold captain badge all stay). Source: `github.com/emilkowalski/skills` → `skills/emil-design-eng/SKILL.md`. How they're applied here, and what to keep to:
+- **Easing:** custom curves only. `EASE_OUT` / `--ease-out` (`cubic-bezier(0.23, 1, 0.32, 1)`) for anything entering, leaving or answering a press. `EASE_DRAWER` / `--ease-drawer` for sheets. Plain `ease` only for colour changes. Never `ease-in`.
+- **Speed:** UI motion under 300ms; press feedback 160ms; sheets 450ms in, 300ms out. Exits are faster than entrances.
+- **Never `transition: all`.** Name the properties (`BTN_T` for colour-changing buttons).
+- **Only animate `transform` and `opacity`** (plus colours). Bars move with `translateX` inside an `overflow: hidden` track, not by animating width.
+- **Every pressable thing responds:** global `button:active { scale(0.97) }` with a transition; wide list rows use `.m-row` (highlight + 0.985).
+- **Nothing appears from `scale(0)`:** popovers and dialogs use `pop-in` (0.96 + fade). The desktop `PlayerCard` is origin-aware (`transformOrigin` set to the side and height of what was clicked); `Modal` stays centred.
+- **Transitions over keyframes for anything a tap can interrupt:** `Sheet` and `ToastPill` mount hidden, then flip a `shown` flag on the next frame.
+- **Gestures:** during a drag, write `style.transform` straight onto the element (no React state per move), then restore the exact transition string React last set. Dismiss on speed as well as distance (sheet: 25% of its height or 0.4px/ms; toast: 36px or 0.11px/ms). Friction when dragged the wrong way, pointer capture, one finger at a time.
+- **Frequency decides:** tab switches and keyboard actions don't animate (Escape and ⌘Z close things instantly). The rise-in stagger (`.m-stagger`, 40ms steps) plays once when the phone app opens; `intro` removes the class after a second, because tabs hidden with `display: none` would replay it.
+- **Hover only for a real mouse:** hover styles live in CSS behind `@media (hover: hover) and (pointer: fine)` (`.tb`, `.side-row`). No `onMouseEnter` style changes.
+- **Reduced motion:** `REDUCED_MOTION` in JS and the media query in the CSS keep fades and drop movement.
+- **Details:** touch targets ≥ 44px (`.m-hit`, `.m-seg` extend small controls), `tabular-nums` on the phone shell, concentric radii (card 22 = control 10 + padding 12), photos fade in on load (instantly if cached).
+- Kept on purpose: the magnets' slight bounce when dropped (a drag, and playful).
+
 ## Conventions & user preferences
 - Mobile: tap targets ≥ 44px, inputs/selects 16px (stops iOS zooming on focus), respect `env(safe-area-inset-*)`, no sideways scroll at 320px.
-- Mobile sheets (`Sheet`): render through `ReactDOM.createPortal` into `<body>`, never inside the main scroll area. There, iPhone Safari chains a swipe that hits the list's end to the page behind, so the list "gets stuck" (Jack reported this on 28 Oct 2026). Size them in px from `useVisibleViewport()` (visualViewport, so they shrink above the keyboard), not by flex-shrinking, which older Safari gets wrong. Search and filters go in `pinned` so only the list scrolls. Drag the top of a sheet down to close it: pointer events on the header (`touch-action: none`), a long drag or a quick flick. Closing slides it away over 200ms. `scrollKey` resets the list's scroll. Inputs inside call `unshiftAfterKeyboard` on blur. `html, body { overscroll-behavior: none }` stops whole-page rubber-banding.
+- Mobile sheets (`Sheet`): render through `ReactDOM.createPortal` into `<body>`, never inside the main scroll area. There, iPhone Safari chains a swipe that hits the list's end to the page behind, so the list "gets stuck" (Jack reported this on 28 Oct 2026). Size them in px from `useVisibleViewport()` (visualViewport, so they shrink above the keyboard), not by flex-shrinking, which older Safari gets wrong. Search and filters go in `pinned` so only the list scrolls. Drag the top of a sheet down to close it: pointer events on the header (`touch-action: none`), a long drag or a quick flick. Structure: the fixed root (`zIndex: 4000`) holds the backdrop (`children[0]`) and the panel (`children[1]`). While any sheet is open, `countSheet` sets `html[data-sheet-open]` and the app shell (`.m-shell`) scales back to 0.94. `scrollKey` resets the list's scroll. Inputs inside call `unshiftAfterKeyboard` on blur. `html, body { overscroll-behavior: none }` stops whole-page rubber-banding.
 - iPhone home-screen app: on iOS 26 the page comes up about a status bar short, leaving a strip under the tab bar. It was white in Jack's 28 Oct 2026 screenshot, because the body has only gradients. Fix: `html { background-color: #060d1a }`, so the strip paints the same navy as the tab bar. **Don't size the shell or sheets taller than the viewport to cover it.** Tried on 28 Oct: iOS then shifts the page and every tap lands about a status bar above the finger. The `MobileApp` shell stays `position: fixed; inset: 0`.
 - **Taps landing above the finger = the page has been scrolled/shifted** (iOS hit-tests fixed layouts against the shifted page). Reported again on 29 Oct 2026 after the redesign. Guards, all needed:
   1. `html.m-app` (set by the head script on phones) pins `body` with `position: fixed`, so the page can't scroll.
