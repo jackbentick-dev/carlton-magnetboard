@@ -25,7 +25,9 @@
     // Buttons that change colour: name the properties (never `all`) and keep the press squeeze
     const BTN_T = `background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 160ms ${EASE_OUT}`;
 
+    // New draftees have no published birthdate yet (dob: null): their age shows as "age tbc"
     const calculateAge = (dob) => {
+      if (!dob) return null;
       const birth = new Date(dob);
       const today = new Date(`${S_YEAR}-01-31`);
       let age = today.getFullYear() - birth.getFullYear();
@@ -33,6 +35,7 @@
           (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age--;
       return age;
     };
+    const ageLabel = (dob, unit = 'y') => { const a = calculateAge(dob); return a === null ? 'age tbc' : `${a}${unit}`; };
 
     // Carlton color palette
     const CARLTON_NAVY = '#0d1c36';
@@ -1092,7 +1095,7 @@
               #{numLabel(pl)} {pl.name}
             </div>
             <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>
-              {avg ? `${avg.games} games` : 'no stats'} • {pl.height}cm • {calculateAge(pl.dob)}y
+              {avg ? `${avg.games} games` : 'no stats'} • {pl.height}cm • {ageLabel(pl.dob)}
             </div>
           </div>
         </div>
@@ -1402,7 +1405,7 @@
                 }}>
                   <span>{player.height}cm</span>
                   <span style={{ opacity: 0.4 }}>•</span>
-                  <span>{age}y</span>
+                  <span>{age === null ? 'age tbc' : `${age}y`}</span>
                 </div>
               </div>
             </div>
@@ -1751,7 +1754,7 @@
                         )}
                       </div>
                       <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', marginTop: '2px' }}>
-                        {player.height}cm • {calculateAge(player.dob)}yo
+                        {player.height}cm • {ageLabel(player.dob, 'yo')}
                       </div>
                     </div>
                   </div>
@@ -1812,7 +1815,7 @@
                 {player.recruit && <span style={{ background: 'rgba(34,197,94,0.2)', color: '#22c55e', fontSize: '9px', fontWeight: '700', padding: '2px 6px', borderRadius: '5px' }}>NEW</span>}
               </div>
               <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', marginTop: '3px' }}>
-                {POS_NAMES[player.position] || player.position} • {player.height}cm • {calculateAge(player.dob)}y
+                {POS_NAMES[player.position] || player.position} • {player.height}cm • {ageLabel(player.dob)}
               </div>
             </div>
           </div>
@@ -2076,7 +2079,7 @@
     const teamBalance = (selected, fieldCount) => {
       const avg = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
       const comp = selected.length ? {
-        age: avg(selected.map(p => calculateAge(p.dob))),
+        age: avg(selected.map(p => calculateAge(p.dob)).filter(a => a !== null)),
         height: avg(selected.map(p => p.height)),
         talls: selected.filter(p => p.height >= 193 && p.position !== 'MID').length,
         rucks: selected.filter(p => p.position === 'RUCK').length,
@@ -3315,7 +3318,7 @@
                         onPointerDown={(e) => startTouchDrag(e, player, 'bench')}
                         onClick={(e) => openCard(e, player, 250)}
                         onDoubleClick={() => removeOnDblClick(player)}
-                        title={`${player.name} • ${player.height}cm • ${calculateAge(player.dob)}y`}
+                        title={`${player.name} • ${player.height}cm • ${ageLabel(player.dob)}`}
                         style={{
                           flex: '1 1 0', minWidth: 0, height: '58px',
                           background: `linear-gradient(145deg, ${CARLTON_NAVY_LIGHT} 0%, ${CARLTON_NAVY} 100%)`,
@@ -3910,7 +3913,7 @@
                     {p.name}{p.captain ? ' (c)' : ''}
                   </span>
                   <span style={{ display: 'block', fontSize: 13, color: M.text2, marginTop: 1 }}>
-                    {POS_NAMES[p.position] || p.position} · {p.height}cm · {calculateAge(p.dob)}
+                    {POS_NAMES[p.position] || p.position} · {p.height}cm · {ageLabel(p.dob, '')}
                   </span>
                 </span>
                 {ra.avg[p.name] !== undefined && (

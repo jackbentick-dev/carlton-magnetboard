@@ -47,12 +47,19 @@ const EASE_DRAWER = 'cubic-bezier(0.32, 0.72, 0, 1)';
 const REDUCED_MOTION = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 // Buttons that change colour: name the properties (never `all`) and keep the press squeeze
 const BTN_T = `background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 160ms ${EASE_OUT}`;
+
+// New draftees have no published birthdate yet (dob: null): their age shows as "age tbc"
 const calculateAge = dob => {
+  if (!dob) return null;
   const birth = new Date(dob);
   const today = new Date(`${S_YEAR}-01-31`);
   let age = today.getFullYear() - birth.getFullYear();
   if (today.getMonth() < birth.getMonth() || today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate()) age--;
   return age;
+};
+const ageLabel = (dob, unit = 'y') => {
+  const a = calculateAge(dob);
+  return a === null ? 'age tbc' : `${a}${unit}`;
 };
 
 // Carlton color palette
@@ -1526,7 +1533,7 @@ const ComparePanel = ({
       color: 'rgba(255,255,255,0.4)',
       fontSize: '10px'
     }
-  }, avg ? `${avg.games} games` : 'no stats', " \u2022 ", pl.height, "cm \u2022 ", calculateAge(pl.dob), "y")));
+  }, avg ? `${avg.games} games` : 'no stats', " \u2022 ", pl.height, "cm \u2022 ", ageLabel(pl.dob))));
   return /*#__PURE__*/React.createElement(GlassCard, {
     style: {
       flex: 1,
@@ -2113,7 +2120,7 @@ const Magnet = ({
     style: {
       opacity: 0.4
     }
-  }, "\u2022"), /*#__PURE__*/React.createElement("span", null, age, "y"))))));
+  }, "\u2022"), /*#__PURE__*/React.createElement("span", null, age === null ? 'age tbc' : `${age}y`))))));
 };
 
 // AFL field — bird's-eye oval at true proportions (165m x 138m, 1m ≈ 3px)
@@ -2795,7 +2802,7 @@ const Sidebar = ({
         fontSize: '11px',
         marginTop: '2px'
       }
-    }, player.height, "cm \u2022 ", calculateAge(player.dob), "yo")));
+    }, player.height, "cm \u2022 ", ageLabel(player.dob, 'yo'))));
   })));
 };
 const POS_NAMES = {
@@ -2911,7 +2918,7 @@ const PlayerSummary = ({
       fontSize: '11px',
       marginTop: '3px'
     }
-  }, POS_NAMES[player.position] || player.position, " \u2022 ", player.height, "cm \u2022 ", calculateAge(player.dob), "y"))), /*#__PURE__*/React.createElement("div", {
+  }, POS_NAMES[player.position] || player.position, " \u2022 ", player.height, "cm \u2022 ", ageLabel(player.dob)))), /*#__PURE__*/React.createElement("div", {
     style: {
       margin: '14px 0 8px',
       display: 'flex',
@@ -3334,7 +3341,7 @@ const ToastPill = ({
 const teamBalance = (selected, fieldCount) => {
   const avg = xs => xs.reduce((s, x) => s + x, 0) / xs.length;
   const comp = selected.length ? {
-    age: avg(selected.map(p => calculateAge(p.dob))),
+    age: avg(selected.map(p => calculateAge(p.dob)).filter(a => a !== null)),
     height: avg(selected.map(p => p.height)),
     talls: selected.filter(p => p.height >= 193 && p.position !== 'MID').length,
     rucks: selected.filter(p => p.position === 'RUCK').length
@@ -5297,7 +5304,7 @@ function App({
         onPointerDown: e => startTouchDrag(e, player, 'bench'),
         onClick: e => openCard(e, player, 250),
         onDoubleClick: () => removeOnDblClick(player),
-        title: `${player.name} • ${player.height}cm • ${calculateAge(player.dob)}y`,
+        title: `${player.name} • ${player.height}cm • ${ageLabel(player.dob)}`,
         style: {
           flex: '1 1 0',
           minWidth: 0,
@@ -6479,7 +6486,7 @@ const PickerSheet = ({
       color: M.text2,
       marginTop: 1
     }
-  }, POS_NAMES[p.position] || p.position, " \xB7 ", p.height, "cm \xB7 ", calculateAge(p.dob))), ra.avg[p.name] !== undefined && /*#__PURE__*/React.createElement("span", {
+  }, POS_NAMES[p.position] || p.position, " \xB7 ", p.height, "cm \xB7 ", ageLabel(p.dob, ''))), ra.avg[p.name] !== undefined && /*#__PURE__*/React.createElement("span", {
     style: {
       textAlign: 'right',
       paddingRight: 2

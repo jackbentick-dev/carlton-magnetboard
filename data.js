@@ -1810,15 +1810,17 @@
 // =====================================================================
 // 2027 SEASON
 // =====================================================================
-// List changes since the end of 2026 (as at 15 Oct 2026, end of trade period).
-// Sources: carltonfc.com.au list-change announcements (9-10 Sep), Zero Hanger
-// (Saad, 5 Oct), Carlton trade hub (Amartey, O'Keeffe, Riley, Whitfield).
+// List changes since the end of 2026 (as at 25 Nov 2026, after the national and rookie drafts).
+// Sources: carltonfc.com.au list-change and draft announcements, AFL.com.au "Ins and outs"
+// (Nov 2026), Zero Hanger (Saad, 5 Oct), Carlton trade hub (Amartey, O'Keeffe, Riley, Whitfield),
+// AFL squad API (Parker). Draftee heights are post-draft listings (sportstralia.com.au, 23 Nov);
+// their birthdates aren't published yet, so dob is null (the app shows "age tbc").
 // To add a move: put the player's exact 2026 name in `out`, or add a full
 // player record to `in`. The 2027 list below is derived automatically.
     const LIST_CHANGES_2027 = {
-      asAt: '15 Oct 2026',
+      asAt: '25 Nov 2026',
       out: [
-        { name: 'Zac Williams',     how: 'Delisted', date: '9 Sep' },
+        { name: 'Zac Williams',     how: 'Retired', date: '8 Nov', note: 'Delisted 9 Sep, then retired' },
         { name: 'Jordan Boyd',      how: 'Delisted', date: '9 Sep' },
         { name: 'Lachie Fogarty',   how: 'Delisted', date: '9 Sep' },
         { name: 'Lewis Young',      how: 'Delisted', date: '9 Sep' },
@@ -1826,22 +1828,33 @@
         { name: 'Flynn Young',      how: 'Delisted', date: '9 Sep' },
         { name: 'Harry Charleson',  how: 'Delisted', date: '9 Sep' },
         { name: 'Matt Duffy',       how: 'Departed', date: 'Aug',    note: 'Returned home to Ireland' },
-        { name: 'Ben Camporeale',   how: 'Delisted', date: '10 Sep', note: 'May get a train-on after the draft' },
-        { name: 'Lucas Camporeale', how: 'Delisted', date: '10 Sep', note: 'May get a train-on after the draft' },
+        { name: 'Ben Camporeale',   how: 'Delisted', date: '10 Sep', note: 'Not re-drafted' },
+        { name: 'Lucas Camporeale', how: 'Delisted', date: '10 Sep', note: 'Not re-drafted' },
         { name: 'Adam Saad',        how: 'Not offered a contract', date: '5 Oct' },
         { name: "Hudson O'Keeffe",  how: 'Traded', date: 'Oct', note: 'To Western Bulldogs (five-team trade, future pick back)' },
-        { name: 'Flynn Riley',      how: 'Traded', date: 'Oct', note: 'Requested move; Carlton received a draft pick' },
+        { name: 'Flynn Riley',      how: 'Traded', date: 'Oct', note: 'To Collingwood (requested move); Carlton received a draft pick' },
       ],
       in: [
         { id: 101, number: null, name: 'Joel Amartey', height: 195, dob: '1999-09-02', position: 'FWD', recruit: true, aflId: 'CD_I1008091',
           how: 'Free agency', from: 'Sydney', note: 'Key forward; Sydney got compensation pick 36' },
         { id: 102, number: null, name: 'Lachie Whitfield', height: 185, dob: '1994-07-18', position: 'DEF', recruit: true, aflId: 'CD_I294305',
           how: 'Trade', from: 'GWS', note: 'Carlton gave picks 25, 26 + 2028 3rd round; got picks 31 and 50' },
+        { id: 103, number: null, name: 'Wil Parker', height: 180, dob: '2002-05-29', position: 'DEF', recruit: true, aflId: 'CD_I1012873',
+          how: 'Delisted free agency', from: 'Collingwood', note: 'Former cricketer; 14 games for the Pies' },
+        { id: 104, number: null, name: 'Cody Walker', height: 187, dob: null, position: 'MID', recruit: true, aflId: null,
+          how: 'Draft pick 3 (father-son)', from: 'Bendigo Pioneers', note: 'Son of Andrew Walker; Carlton matched Richmond’s bid' },
+        { id: 105, number: null, name: 'Harvey Spawton-Guy', height: 195, dob: null, position: 'FWD', recruit: true, aflId: null,
+          how: 'Draft pick 32', from: 'West Perth', note: 'Key forward' },
+        { id: 106, number: null, name: 'Jackson Watkins', height: 186, dob: null, position: 'FWD', recruit: true, aflId: null,
+          how: 'Draft pick 37', from: 'Calder Cannons', note: 'Medium forward' },
+        { id: 107, number: null, name: 'Ethan Herbert', height: 201, dob: null, position: 'RUCK', recruit: true, aflId: null,
+          how: 'Draft pick 46', from: 'North Adelaide', note: 'Ruck; pick 46 came from a live trade' },
+        { id: 108, number: null, name: 'Marcus Prasad', height: 167, dob: null, position: 'FWD', recruit: true, aflId: null,
+          how: 'Rookie draft pick 8', from: 'Dandenong Stingrays', note: 'Small forward' },
       ],
       pending: [
-        { what: 'Wil Parker (Collingwood, delisted free agent)', note: 'Davies: "looks like it’ll get completed" in the delisted FA period' },
-        { what: 'Another ruck', note: 'Club wants one before 2027, via delisted FA or the draft' },
-        { what: 'National draft (Nov)', note: 'About five live picks, plus a likely father-son/academy bid to match' },
+        { what: 'Jumper numbers for the new players', note: 'Not announced yet' },
+        { what: 'Birthdates for the draftees', note: 'Not published yet' },
       ],
     };
 
