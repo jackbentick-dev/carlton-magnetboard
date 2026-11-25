@@ -48,11 +48,11 @@ const REDUCED_MOTION = typeof matchMedia === 'function' && matchMedia('(prefers-
 // Buttons that change colour: name the properties (never `all`) and keep the press squeeze
 const BTN_T = `background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 160ms ${EASE_OUT}`;
 
-// New draftees have no published birthdate yet (dob: null): their age shows as "age tbc"
+// Age today (a player with no known birthdate, dob: null, shows "age tbc")
 const calculateAge = dob => {
   if (!dob) return null;
   const birth = new Date(dob);
-  const today = new Date(`${S_YEAR}-01-31`);
+  const today = new Date();
   let age = today.getFullYear() - birth.getFullYear();
   if (today.getMonth() < birth.getMonth() || today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate()) age--;
   return age;

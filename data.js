@@ -1813,8 +1813,8 @@
 // List changes since the end of 2026 (as at 25 Nov 2026, after the national and rookie drafts).
 // Sources: carltonfc.com.au list-change and draft announcements, AFL.com.au "Ins and outs"
 // (Nov 2026), Zero Hanger (Saad, 5 Oct), Carlton trade hub (Amartey, O'Keeffe, Riley, Whitfield),
-// AFL squad API (Parker). Draftee heights are post-draft listings (sportstralia.com.au, 23 Nov);
-// their birthdates aren't published yet, so dob is null (the app shows "age tbc").
+// AFL squad API (Parker). Draftee heights and birthdates: draftguru.com.au (25 Nov), until the
+// AFL squad API (compSeason 102) lists them.
 // To add a move: put the player's exact 2026 name in `out`, or add a full
 // player record to `in`. The 2027 list below is derived automatically.
     const LIST_CHANGES_2027 = {
@@ -1841,20 +1841,19 @@
           how: 'Trade', from: 'GWS', note: 'Carlton gave picks 25, 26 + 2028 3rd round; got picks 31 and 50' },
         { id: 103, number: null, name: 'Wil Parker', height: 180, dob: '2002-05-29', position: 'DEF', recruit: true, aflId: 'CD_I1012873',
           how: 'Delisted free agency', from: 'Collingwood', note: 'Former cricketer; 14 games for the Pies' },
-        { id: 104, number: null, name: 'Cody Walker', height: 187, dob: null, position: 'MID', recruit: true, aflId: null,
+        { id: 104, number: null, name: 'Cody Walker', height: 186, dob: '2008-01-26', position: 'MID', recruit: true, aflId: null,
           how: 'Draft pick 3 (father-son)', from: 'Bendigo Pioneers', note: 'Son of Andrew Walker; Carlton matched Richmond’s bid' },
-        { id: 105, number: null, name: 'Harvey Spawton-Guy', height: 195, dob: null, position: 'FWD', recruit: true, aflId: null,
+        { id: 105, number: null, name: 'Harvey Spawton-Guy', height: 195, dob: '2008-09-08', position: 'FWD', recruit: true, aflId: null,
           how: 'Draft pick 32', from: 'West Perth', note: 'Key forward' },
-        { id: 106, number: null, name: 'Jackson Watkins', height: 186, dob: null, position: 'FWD', recruit: true, aflId: null,
+        { id: 106, number: null, name: 'Jackson Watkins', height: 186, dob: '2008-10-04', position: 'FWD', recruit: true, aflId: null,
           how: 'Draft pick 37', from: 'Calder Cannons', note: 'Medium forward' },
-        { id: 107, number: null, name: 'Ethan Herbert', height: 201, dob: null, position: 'RUCK', recruit: true, aflId: null,
+        { id: 107, number: null, name: 'Ethan Herbert', height: 201, dob: '2008-11-01', position: 'RUCK', recruit: true, aflId: null,
           how: 'Draft pick 46', from: 'North Adelaide', note: 'Ruck; pick 46 came from a live trade' },
-        { id: 108, number: null, name: 'Marcus Prasad', height: 167, dob: null, position: 'FWD', recruit: true, aflId: null,
+        { id: 108, number: null, name: 'Marcus Prasad', height: 168, dob: '2008-03-23', position: 'FWD', recruit: true, aflId: null,
           how: 'Rookie draft pick 8', from: 'Dandenong Stingrays', note: 'Small forward' },
       ],
       pending: [
         { what: 'Jumper numbers for the new players', note: 'Not announced yet' },
-        { what: 'Birthdates for the draftees', note: 'Not published yet' },
       ],
     };
 
