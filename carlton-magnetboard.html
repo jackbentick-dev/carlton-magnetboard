@@ -25,6 +25,11 @@
       if (window.CARLTON_MOBILE) document.documentElement.classList.add('m-app');
       // iPhones only show a button's pressed (:active) state if something listens for touches
       document.addEventListener('touchstart', function () {}, { passive: true });
+      // Keep a copy of the app on the device so it opens with no signal (sw.js). Web only: a
+      // page opened from disk on the Mac can't use one, and doesn't need it.
+      if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+        window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+      }
     })();
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">

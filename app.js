@@ -3821,7 +3821,8 @@ const ghFetch = async (token, path, opts = {}) => {
         'Content-Type': 'application/json'
       } : {})
     },
-    body: opts.body ? JSON.stringify(opts.body) : undefined
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+    keepalive: !!opts.keepalive
   });
   if (!res.ok) {
     throw new Error(res.status === 401 ? 'GitHub didn’t accept the token (expired or revoked?)' : res.status === 404 ? 'The sync gist is gone, or this token can’t see it' : `GitHub error ${res.status}`);
@@ -4001,14 +4002,25 @@ const syncVotes = async cur => {
     ...loadSync(),
     last: Date.now()
   });
+  lastDoc = {
+    seasons,
+    resets
+  };
   return {
     cells: curCells,
     reset: resets[String(S_YEAR)]
   };
 };
+// The gist as of the last sync. When the app is put away with votes not yet sent, there's no
+// time for a fresh read, so they're merged onto this and sent in one go (see flush below).
+let lastDoc = null;
+const isOffline = e => typeof navigator !== 'undefined' && navigator.onLine === false || e && (e.name === 'TypeError' || /fetch|network|load failed/i.test(e.message || ''));
 
-// Stamps this device's vote changes, pushes ~1.5s after them, and pulls on open/foreground
-const useVoteSync = (votes, setVotes) => {
+// Stamps this device's vote changes and sends them within a second. Pulls on open, on coming
+// back to the front, when the signal returns and every minute while on screen. With no signal
+// the votes wait on the device (state 'offline', amber) and go as soon as it can reach GitHub;
+// that isn't an error. `onPulled(n)` is told when votes arrive from another device.
+const useVoteSync = (votes, setVotes, onPulled) => {
   const [status, setStatus] = useState(() => {
     const c = loadSync();
     return c ? {
@@ -4023,7 +4035,16 @@ const useVoteSync = (votes, setVotes) => {
   const fromSync = useRef(false);
   const busy = useRef(false),
     again = useRef(false),
-    timer = useRef(null);
+    timer = useRef(null),
+    retry = useRef(null),
+    fails = useRef(0);
+  const pulledRef = useRef(onPulled);
+  pulledRef.current = onPulled;
+  // Votes changed here since the last successful sync
+  const pendingCount = () => {
+    const c = loadSync();
+    return c ? Object.values(stamps.current).filter(t => t > (c.last || 0)).length : 0;
+  };
   const run = async () => {
     if (!loadSync()) {
       setStatus(null);
@@ -4034,11 +4055,13 @@ const useVoteSync = (votes, setVotes) => {
       return;
     }
     busy.current = true;
+    clearTimeout(retry.current);
     setStatus(s => ({
       ...(s || {}),
       state: 'syncing'
     }));
     try {
+      const before = live.current;
       const {
         cells: merged,
         reset
@@ -4058,18 +4081,31 @@ const useVoteSync = (votes, setVotes) => {
       if (stableJSON(nv) !== stableJSON(fromCells(toCells(live.current, {})).votes)) {
         fromSync.current = true;
         setVotes(nv);
+        const n = [...new Set([...voteKeys(before), ...voteKeys(nv)])].filter(k => cellVal(before, k) !== cellVal(nv, k)).length;
+        if (n && pulledRef.current) pulledRef.current(n);
       }
+      fails.current = 0;
       setStatus({
         state: 'ok',
         last: Date.now()
       });
     } catch (e) {
-      const msg = e && e.message === 'Failed to fetch' ? 'Couldn’t reach GitHub (offline?)' : e && e.message || 'Sync failed';
-      setStatus({
-        state: 'error',
-        msg,
-        last: (loadSync() || {}).last
-      });
+      if (isOffline(e)) {
+        // Try again soon: 15s, 30s, then every minute
+        fails.current += 1;
+        retry.current = setTimeout(() => runRef.current(), Math.min(60000, 15000 * fails.current));
+        setStatus({
+          state: 'offline',
+          pending: pendingCount(),
+          last: (loadSync() || {}).last
+        });
+      } else {
+        setStatus({
+          state: 'error',
+          msg: e && e.message || 'Sync failed',
+          last: (loadSync() || {}).last
+        });
+      }
     }
     busy.current = false;
     if (again.current) {
@@ -4079,6 +4115,59 @@ const useVoteSync = (votes, setVotes) => {
   };
   const runRef = useRef(run);
   runRef.current = run;
+
+  // Put away with votes not yet sent (phone locked on the way home): send them now, in one
+  // request the browser finishes even after the page stops (keepalive), merged onto the gist
+  // as last seen. The next normal sync tidies up anything another device changed meanwhile.
+  const flush = () => {
+    const cfg = loadSync();
+    if (!cfg || !pendingCount()) return;
+    clearTimeout(timer.current);
+    if (!lastDoc) {
+      runRef.current();
+      return;
+    }
+    const seasons = {
+      ...lastDoc.seasons
+    };
+    Object.keys(SEASONS).forEach(y => {
+      const here = String(S_YEAR) === y;
+      const local = dropBefore(here ? toCells(live.current, stamps.current) : toCells(loadJSON(`carlton-bf-${y}`), loadJSON(stampsKey(y))), lastDoc.resets[y]);
+      seasons[y] = mergeCells(local, lastDoc.seasons[y]);
+    });
+    const body = {
+      files: {
+        [SYNC_FILE]: {
+          content: JSON.stringify({
+            app: 'carlton-magnetboard',
+            version: 1,
+            updated: new Date().toISOString(),
+            seasons,
+            resets: lastDoc.resets
+          })
+        }
+      }
+    };
+    // keepalive requests are capped at 64 KB; past that, fall back to an ordinary sync
+    if (JSON.stringify(body).length > 60000) {
+      runRef.current();
+      return;
+    }
+    ghFetch(cfg.token, `/gists/${cfg.gistId}`, {
+      method: 'PATCH',
+      body,
+      keepalive: true
+    }).then(() => {
+      lastDoc = {
+        seasons,
+        resets: lastDoc.resets
+      };
+      saveSync({
+        ...loadSync(),
+        last: Date.now()
+      });
+    }).catch(() => {});
+  };
   useEffect(() => {
     const before = prev.current;
     prev.current = votes;
@@ -4093,26 +4182,34 @@ const useVoteSync = (votes, setVotes) => {
       } catch {}
       if (loadSync()) {
         clearTimeout(timer.current);
-        timer.current = setTimeout(() => runRef.current(), 1500);
+        timer.current = setTimeout(() => runRef.current(), 600);
       }
     }
   }, [votes]);
 
-  // Pull on open, on coming back to the front, and every minute while on screen
-  // (a board left open on the Mac never gets a focus event)
+  // Pull on open, on coming back to the front, when the signal returns, and every minute while
+  // on screen (a board left open on the Mac never gets a focus event). Send on the way out.
   useEffect(() => {
     runRef.current();
     const wake = () => {
-      if (document.visibilityState === 'visible') runRef.current();
+      if (document.visibilityState === 'visible') runRef.current();else flush();
     };
+    const online = () => runRef.current();
+    const tick = setInterval(() => {
+      if (document.visibilityState === 'visible') runRef.current();
+    }, 60000);
     document.addEventListener('visibilitychange', wake);
     window.addEventListener('focus', wake);
-    const tick = setInterval(wake, 60000);
+    window.addEventListener('online', online);
+    window.addEventListener('pagehide', flush);
     return () => {
       document.removeEventListener('visibilitychange', wake);
       window.removeEventListener('focus', wake);
+      window.removeEventListener('online', online);
+      window.removeEventListener('pagehide', flush);
       clearInterval(tick);
       clearTimeout(timer.current);
+      clearTimeout(retry.current);
     };
   }, []);
 
@@ -4264,7 +4361,8 @@ const useVoteSync = (votes, setVotes) => {
     syncNow: () => runRef.current(),
     claim,
     take,
-    refresh
+    refresh,
+    pendingCount
   };
 };
 const ago = ms => {
@@ -4278,8 +4376,8 @@ const ago = ms => {
     month: 'short'
   });
 };
-const syncColor = st => !st ? 'rgba(255,255,255,0.55)' : st.state === 'error' ? '#f87171' : st.state === 'syncing' ? '#fbbf24' : '#4ade80';
-const syncLabel = st => !st ? 'Sync votes' : st.state === 'error' ? 'Sync failed' : st.state === 'syncing' ? 'Syncing…' : 'Synced';
+const syncColor = st => !st ? 'rgba(255,255,255,0.55)' : st.state === 'error' ? '#f87171' : st.state === 'syncing' || st.state === 'offline' ? '#fbbf24' : '#4ade80';
+const syncLabel = st => !st ? 'Sync votes' : st.state === 'error' ? 'Sync failed' : st.state === 'syncing' ? 'Syncing…' : st.state === 'offline' ? st.pending ? `${st.pending} vote${st.pending === 1 ? '' : 's'} waiting for signal` : 'No signal' : 'Synced';
 
 // Connect / status / disconnect. Shared by the desktop modal and the phone sheet.
 const SyncPanel = ({
@@ -4350,9 +4448,9 @@ const SyncPanel = ({
         ...para,
         color: st && st.state === 'error' ? '#f87171' : para.color
       }
-    }, st && st.state === 'error' ? st.msg : st && st.state === 'syncing' ? 'Syncing…' : `Last synced ${ago(st ? st.last : cfg.last)}`), /*#__PURE__*/React.createElement("div", {
+    }, st && st.state === 'error' ? st.msg : st && st.state === 'syncing' ? 'Syncing…' : st && st.state === 'offline' ? `${syncLabel(st)}. They’ll send by themselves once you have signal.` : `Last synced ${ago(st ? st.last : cfg.last)}`), /*#__PURE__*/React.createElement("div", {
       style: para
-    }, "Votes sync automatically: a moment after you vote, when the app opens or comes back to the front, and every minute while it's on screen. Every season syncs, not just the one showing."), /*#__PURE__*/React.createElement("div", {
+    }, "Nothing to press: votes send a second after you make them, or when you lock your phone, and wait on the phone if there's no signal. Your other device picks them up when it opens, and every minute while it's on screen. Every season syncs."), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         gap: '8px'
@@ -4655,7 +4753,7 @@ function App({
   } = useUndoToast();
 
   // --- Vote sync with the phone ---
-  const sync = useVoteSync(votes, setVotes);
+  const sync = useVoteSync(votes, setVotes, n => showToast(`${n} vote${n === 1 ? '' : 's'} from your other device`));
   const [syncOpen, setSyncOpen] = useState(false);
   const closeSync = useCallback(() => setSyncOpen(false), []);
 
@@ -4765,55 +4863,31 @@ function App({
     }
   });
   const [syncState, setSyncState] = useState('');
-  const parseSquiggleGames = games => {
-    const merged = {};
-    const taken = {};
-    games.filter(g => g.complete === 100).sort((a, b) => (a.unixtime || 0) - (b.unixtime || 0)).forEach(g => {
-      const carltonHome = g.hteam === 'Carlton';
-      const oppRaw = carltonHome ? g.ateam : g.hteam;
-      const opp = SQUIGGLE_NAMES[oppRaw] || oppRaw;
-      const fx = S_FIXTURE.find(f => f.opponent === opp && !taken[f.round]);
-      if (!fx) return;
-      taken[fx.round] = true;
-      const forScore = carltonHome ? g.hscore : g.ascore;
-      const against = carltonHome ? g.ascore : g.hscore;
-      merged[fx.round] = {
-        for: forScore,
-        against,
-        result: forScore === against ? 'D' : g.winner === 'Carlton' ? 'W' : 'L'
-      };
-    });
-    return merged;
-  };
   const syncResults = async () => {
     setSyncState('syncing');
-    const api = `https://api.squiggle.com.au/?q=games;year=${S_YEAR};team=3`;
-    const attempts = [api, 'https://api.allorigins.win/raw?url=' + encodeURIComponent(api)];
-    for (const url of attempts) {
-      try {
-        const resp = await fetch(url);
-        if (!resp.ok) continue;
-        const data = await resp.json();
-        const merged = parseSquiggleGames(data.games || []);
-        if (Object.keys(merged).length === 0) continue;
-        setResults(prev => {
-          const next = {
-            ...prev,
-            ...merged
-          };
-          try {
-            localStorage.setItem(`carlton-results-${S_YEAR}`, JSON.stringify(next));
-          } catch {}
-          return next;
-        });
-        setSyncState('ok');
-        setTimeout(() => setSyncState(''), 3000);
-        return;
-      } catch {}
+    const merged = await fetchSquiggleResults();
+    if (merged) {
+      setResults(prev => {
+        const next = {
+          ...prev,
+          ...merged
+        };
+        try {
+          localStorage.setItem(`carlton-results-${S_YEAR}`, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+      setSyncState('ok');
+      setTimeout(() => setSyncState(''), 3000);
+      return;
     }
     setSyncState('fail');
     setTimeout(() => setSyncState(''), 4000);
   };
+  // Fetch new scores by themselves once a game has finished
+  useEffect(() => {
+    if (resultsDue(results)) syncResults();
+  }, []);
 
   // --- Team sheet PNG export ---
   const exportTeamSheet = () => saveTeamSheet(fieldPlayers, false);
@@ -6953,10 +7027,92 @@ const VoteBar = ({
     }
   }, s)));
 };
+
+// ---- Votes on the phone ----
+const TEAM_SIZE = 23;
+// Shown once every player in a round has a vote: says where the votes have got to
+const doneText = sync => {
+  const st = sync && sync.status;
+  if (!st) return 'All voted';
+  if (st.state === 'offline') return 'All voted · will send when you have signal';
+  if (st.state === 'syncing') return 'All voted · sending…';
+  if (st.state === 'error') return 'All voted · sync needs attention';
+  return 'All voted · sent to your other devices';
+};
+
+// Squiggle games → { round: { for, against, result } }, matched to the fixture by opponent in
+// date order
+const parseSquiggleGames = games => {
+  const merged = {};
+  const taken = {};
+  games.filter(g => g.complete === 100).sort((a, b) => (a.unixtime || 0) - (b.unixtime || 0)).forEach(g => {
+    const carltonHome = g.hteam === 'Carlton';
+    const oppRaw = carltonHome ? g.ateam : g.hteam;
+    const opp = SQUIGGLE_NAMES[oppRaw] || oppRaw;
+    const fx = S_FIXTURE.find(f => f.opponent === opp && !taken[f.round]);
+    if (!fx) return;
+    taken[fx.round] = true;
+    const forScore = carltonHome ? g.hscore : g.ascore;
+    const against = carltonHome ? g.ascore : g.hscore;
+    merged[fx.round] = {
+      for: forScore,
+      against,
+      result: forScore === against ? 'D' : g.winner === 'Carlton' ? 'W' : 'L'
+    };
+  });
+  return merged;
+};
+const fetchSquiggleResults = async () => {
+  const api = `https://api.squiggle.com.au/?q=games;year=${S_YEAR};team=3`;
+  for (const url of [api, 'https://api.allorigins.win/raw?url=' + encodeURIComponent(api)]) {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      const merged = parseSquiggleGames(data.games || []);
+      if (Object.keys(merged).length) return merged;
+    } catch {}
+  }
+  return null;
+};
+// A game that finished (2.5 hours after the bounce) but has no score saved yet
+const resultsDue = results => S_FIXTURE.some(g => g.start && !results[g.round] && Date.now() - new Date(g.start).getTime() > 2.5 * 3600 * 1000);
+// Scores for the phone: the bundled ones plus any fetched from Squiggle, fetched by themselves
+// once a game has finished
+const useLiveResults = () => {
+  const [results, setResults] = useState(() => ({
+    ...S_RESULTS,
+    ...loadJSON(`carlton-results-${S_YEAR}`)
+  }));
+  useEffect(() => {
+    if (!resultsDue(results)) return;
+    let off = false;
+    fetchSquiggleResults().then(merged => {
+      if (off || !merged) return;
+      setResults(prev => {
+        const next = {
+          ...prev,
+          ...merged
+        };
+        try {
+          localStorage.setItem(`carlton-results-${S_YEAR}`, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    });
+    return () => {
+      off = true;
+    };
+  }, []);
+  return results;
+};
 const MobileVotes = ({
   votes,
   setVotes,
   ratings,
+  results,
+  board,
+  sync,
   onSeason,
   setNavTitle,
   intro
@@ -6967,21 +7123,39 @@ const MobileVotes = ({
     rating: d.rating,
     tog: d.tog
   })).filter(x => x.player).sort((x, y) => y.rating - x.rating);
-  const scoredIn = r => S_PLAYERS.filter(p => votes[p.id]?.[r] !== undefined && votes[p.id]?.[r] !== null).length;
+  const hasVote = (p, r) => votes[p.id]?.[r] !== undefined && votes[p.id]?.[r] !== null;
+  const scoredIn = r => S_PLAYERS.filter(p => hasVote(p, r)).length;
+  // Who played: Wheelo ratings when the round has them. Without (a new season, before stats are
+  // loaded), it's whoever you've voted for plus last week's team, or your Best 23 in the first
+  // game, so the likely 23 are already listed and you add or skip the changes.
+  const likelyTeam = r => {
+    const at = playable.findIndex(g => g.round === r);
+    const earlier = playable.slice(0, Math.max(0, at)).reverse().find(g => scoredIn(g.round) > 0);
+    const base = earlier ? S_PLAYERS.filter(p => hasVote(p, earlier.round)) : S_PLAYERS.filter(p => board && board[p.id]);
+    const ids = new Set([...S_PLAYERS.filter(p => hasVote(p, r)), ...base].map(p => p.id));
+    return S_PLAYERS.filter(p => ids.has(p.id)).sort((a, b) => (a.number ?? 99) - (b.number ?? 99)).map(p => ({
+      player: p
+    }));
+  };
+  const targetFor = r => playedIn(r).length || TEAM_SIZE;
+  const started = g => !!g.start && new Date(g.start).getTime() <= Date.now();
+  const inUse = g => playedIn(g.round).length > 0 || scoredIn(g.round) > 0;
 
-  // Opens on the latest round with ratings: the one you most likely want to vote on
+  // Opens on the latest game that's been played (or has votes or ratings): the one you most
+  // likely want to vote on, straight after the siren
   const [round, setRound] = useState(() => {
-    const rated = playable.filter(g => playedIn(g.round).length > 0);
-    return (rated[rated.length - 1] || playable[0] || {}).round;
+    const live = playable.filter(g => started(g) || inUse(g));
+    return (live[live.length - 1] || playable[0] || {}).round;
   });
   const [view, setView] = useState('vote');
   const [showAll, setShowAll] = useState(false);
   const rowRefs = useRef({});
   const idx = playable.findIndex(g => g.round === round);
   const game = playable[idx];
-  const played = game ? playedIn(round) : [];
+  const rated = game ? playedIn(round) : [];
+  const played = rated.length ? rated : game ? likelyTeam(round) : [];
   const scored = game ? scoredIn(round) : 0;
-  const target = played.length || null;
+  const target = game ? targetFor(round) : null;
   useEffect(() => {
     setNavTitle(game ? `${game.round} v ${game.opponent} · ${scored}${target ? '/' + target : ''}` : 'B&F votes');
   }, [round, scored, target]);
@@ -6996,14 +7170,14 @@ const MobileVotes = ({
       text: `Voting opens once the ${S_YEAR} fixture is released. Your 2026 votes are under 2026.`
     }));
   }
-  const res = S_RESULTS[round];
+  const res = (results || S_RESULTS)[round];
   const playedIds = new Set(played.map(x => x.player.id));
-  const others = S_PLAYERS.filter(p => !playedIds.has(p.id)).sort((a, b) => a.number - b.number).map(p => ({
+  const others = S_PLAYERS.filter(p => !playedIds.has(p.id)).sort((a, b) => (a.number ?? 99) - (b.number ?? 99)).map(p => ({
     player: p
   }));
   const list = played.length ? showAll ? [...played, ...others] : played : others;
-  const ratedRounds = playable.filter(g => playedIn(g.round).length);
-  const doneRounds = ratedRounds.filter(g => scoredIn(g.round) >= playedIn(g.round).length).length;
+  const ratedRounds = playable.filter(inUse);
+  const doneRounds = ratedRounds.filter(g => scoredIn(g.round) >= targetFor(g.round)).length;
   const setScore = (pid, s) => {
     const off = votes[pid]?.[round] === s;
     setVotes(prev => ({
@@ -7032,9 +7206,9 @@ const MobileVotes = ({
     }, 140);
   };
   const roundStatus = r => {
-    const n = playedIn(r).length,
+    const n = targetFor(r),
       s = scoredIn(r);
-    return !n ? '' : s >= n ? '  ✓' : s ? `  (${n - s} left)` : '';
+    return !s && !playedIn(r).length ? '' : s >= n ? '  ✓' : s ? `  (${n - s} left)` : '';
   };
   const totals = S_PLAYERS.map(p => {
     const vs = Object.values(votes[p.id] || {}).filter(v => v !== undefined && v !== null);
@@ -7074,8 +7248,8 @@ const MobileVotes = ({
     className: intro ? 'm-stagger' : undefined
   }, /*#__PURE__*/React.createElement(LargeTitle, {
     title: "B&F votes",
-    subtitle: `${S_YEAR} season · ${doneRounds} of ${ratedRounds.length} rounds voted`,
-    onSeason: onSeason
+    onSeason: onSeason,
+    subtitle: ratedRounds.length ? `${S_YEAR} season · ${doneRounds} of ${ratedRounds.length} rounds voted` : `${S_YEAR} season · first game ${[playable[0].date, playable[0].time].filter(Boolean).join(', ')}`
   }), /*#__PURE__*/React.createElement(Segmented, {
     options: [['vote', 'Vote'], ['board', 'Leaderboard']],
     value: view,
@@ -7312,7 +7486,7 @@ const MobileVotes = ({
       color: M.text2,
       marginBottom: 6
     }
-  }, /*#__PURE__*/React.createElement("span", null, scored >= target ? 'All players voted' : `${scored} of ${target} voted`), /*#__PURE__*/React.createElement("span", null, Math.round(scored / target * 100), "%")), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, scored >= target ? doneText(sync) : `${scored} of ${target} voted`), /*#__PURE__*/React.createElement("span", null, Math.round(scored / target * 100), "%")), /*#__PURE__*/React.createElement("div", {
     style: {
       height: 6,
       borderRadius: 3,
@@ -7335,14 +7509,16 @@ const MobileVotes = ({
       textAlign: 'center',
       margin: '14px 0 4px'
     }
-  }, "0 poor \xB7 1 OK \xB7 2 good \xB7 3 very good \xB7 4 best on ground"), !played.length && /*#__PURE__*/React.createElement("div", {
+  }, "0 poor \xB7 1 OK \xB7 2 good \xB7 3 very good \xB7 4 best on ground"), !rated.length && /*#__PURE__*/React.createElement("div", {
     style: {
       color: M.text2,
       fontSize: 14,
       textAlign: 'center',
-      padding: '6px 0'
-    }
-  }, "No Wheelo ratings for ", game.round, " yet, so everyone's listed."), list.map(({
+      padding: '6px 0 2px',
+      lineHeight: 1.4
+    },
+    className: "m-balance"
+  }, scoredIn(round) || playable.slice(0, idx).some(g => scoredIn(g.round)) ? 'Last week’s team is listed. Skip anyone who didn’t play and add the changes below.' : 'Your Best 23 is listed. Skip anyone who didn’t play and add the changes below.'), list.map(({
     player: p,
     rating,
     tog
@@ -7411,7 +7587,7 @@ const MobileVotes = ({
       width: '100%',
       marginTop: 16
     }
-  }, showAll ? 'Hide players who didn’t play' : `Show the other ${others.length} players`)));
+  }, showAll ? rated.length ? 'Hide players who didn’t play' : 'Hide the rest of the list' : `Show the other ${others.length} players`)));
 };
 
 // ---- App shell ----
@@ -7495,15 +7671,21 @@ const MenuGroup = ({
 function MobileApp({
   onSeason
 }) {
+  const [board, setBoard] = useState(() => loadJSON(`carlton-board-${S_YEAR}`));
+  const [votes, setVotes] = useState(() => loadJSON(`carlton-bf-${S_YEAR}`));
+  // Straight after a game (up to two days on) with votes still to give, open on B&F votes
   const [tab, setTab] = useState(() => {
+    const now = Date.now();
+    const recent = S_FIXTURE.filter(g => g.start && now - new Date(g.start).getTime() > 2 * 3600 * 1000 && now - new Date(g.start).getTime() < 48 * 3600 * 1000);
+    const due = recent.some(g => S_PLAYERS.filter(p => votes[p.id]?.[g.round] !== undefined && votes[p.id]?.[g.round] !== null).length < TEAM_SIZE);
+    if (due) return 'bf';
     try {
       return localStorage.getItem('carlton-mobile-tab') || 'team';
     } catch {
       return 'team';
     }
   });
-  const [board, setBoard] = useState(() => loadJSON(`carlton-board-${S_YEAR}`));
-  const [votes, setVotes] = useState(() => loadJSON(`carlton-bf-${S_YEAR}`));
+  const results = useLiveResults();
   const [ratings, setRatings] = useState(loadRatings);
   const [menu, setMenu] = useState(false);
   const [scrolled, setScrolled] = useState({
@@ -7522,7 +7704,7 @@ function MobileApp({
     runUndo,
     dismissToast
   } = useUndoToast();
-  const sync = useVoteSync(votes, setVotes);
+  const sync = useVoteSync(votes, setVotes, n => showToast(`${n} vote${n === 1 ? '' : 's'} from your other device`));
   const [syncOpen, setSyncOpen] = useState(false);
   // The rise-in stagger plays once, when the app opens. Tabs are hidden with display:none, and
   // CSS animations restart when an element is shown again, so the class comes off after a second.
@@ -7663,6 +7845,9 @@ function MobileApp({
     votes: votes,
     setVotes: setVotes,
     ratings: ratings,
+    results: results,
+    board: board,
+    sync: sync,
     onSeason: onSeason,
     setNavTitle: titleSetter('bf'),
     intro: intro

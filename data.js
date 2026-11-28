@@ -1862,8 +1862,34 @@
       .map(p => ({ ...p, recruit: false }))
       .concat(LIST_CHANGES_2027.in.map(({ how, from, note, ...p }) => p));
 
-    // Fill in once the AFL releases the 2027 fixture.
-    const FIXTURE_2027 = [];
+    // From Squiggle (api.squiggle.com.au, 28 Nov 2026). From R17 the AFL hasn't fixed days or times yet:
+    // those games say "Week of …" (tbc: true) and `start` is the Monday of that week. Times are Melbourne time.
+    const FIXTURE_2027 = [
+      { round: 'R1', date: 'Sat Mar 20', time: '12:35pm', opponent: 'Richmond', venue: 'MCG', home: false, start: '2027-03-20T12:35:00+11:00' },
+      { round: 'R2', date: 'Fri Mar 26', time: '3:15pm', opponent: 'North Melbourne', venue: 'Marvel', home: false, start: '2027-03-26T15:15:00+11:00', tag: 'Good Friday' },
+      { round: 'R3', date: 'Fri Apr 2', time: '7:50pm', opponent: 'Brisbane', venue: 'Marvel', home: true, start: '2027-04-02T19:50:00+11:00' },
+      { round: 'R4', date: 'Sat Apr 10', time: '1:35pm', opponent: 'Melbourne', venue: 'Adelaide Oval', home: true, start: '2027-04-10T13:35:00+10:00', tag: 'Gather Round' },
+      { round: 'R5', date: 'Thu Apr 15', time: '7:30pm', opponent: 'Collingwood', venue: 'MCG', home: true, start: '2027-04-15T19:30:00+10:00' },
+      { round: 'R6', date: 'Sat Apr 24', time: '8:10pm', opponent: 'Port Adelaide', venue: 'Adelaide Oval', home: false, start: '2027-04-24T20:10:00+10:00' },
+      { round: 'R7', date: 'Fri Apr 30', time: '7:40pm', opponent: 'Hawthorn', venue: 'MCG', home: false, start: '2027-04-30T19:40:00+10:00' },
+      { round: 'R8', date: 'Thu May 6', time: '7:30pm', opponent: 'Geelong', venue: 'MCG', home: true, start: '2027-05-06T19:30:00+10:00' },
+      { round: 'R9', date: 'Sun May 16', time: '3:15pm', opponent: 'Western Bulldogs', venue: 'MCG', home: true, start: '2027-05-16T15:15:00+10:00' },
+      { round: 'R10', date: 'Sun May 23', time: '6:10pm', opponent: 'Gold Coast', venue: 'TIO Stadium', home: false, start: '2027-05-23T18:10:00+10:00' },
+      { round: 'R11', date: 'Sun May 30', time: '6:10pm', opponent: 'Fremantle', venue: 'Marvel', home: true, start: '2027-05-30T18:10:00+10:00' },
+      { round: 'R12', date: 'Sun Jun 6', time: '8:10pm', opponent: 'West Coast', venue: 'Optus Stadium', home: false, start: '2027-06-06T20:10:00+10:00' },
+      { round: 'R13', date: 'Sun Jun 13', time: '7:20pm', opponent: 'Essendon', venue: 'MCG', home: true, start: '2027-06-13T19:20:00+10:00' },
+      { round: 'R14', date: '', time: '', opponent: 'BYE', venue: '', home: null },
+      { round: 'R15', date: 'Sun Jun 27', time: '3:15pm', opponent: 'St Kilda', venue: 'Marvel', home: false, start: '2027-06-27T15:15:00+10:00' },
+      { round: 'R16', date: 'Sat Jul 3', time: '7:35pm', opponent: 'North Melbourne', venue: 'Marvel', home: true, start: '2027-07-03T19:35:00+10:00' },
+      { round: 'R17', date: 'Week of Jul 5', time: '', opponent: 'GWS', venue: 'ENGIE Stadium', home: false, start: '2027-07-05T12:00:00+10:00', tbc: true },
+      { round: 'R18', date: 'Week of Jul 12', time: '', opponent: 'Melbourne', venue: 'MCG', home: true, start: '2027-07-12T12:00:00+10:00', tbc: true },
+      { round: 'R19', date: 'Week of Jul 19', time: '', opponent: 'Geelong', venue: 'GMHBA Stadium', home: false, start: '2027-07-19T12:00:00+10:00', tbc: true },
+      { round: 'R20', date: 'Week of Jul 26', time: '', opponent: 'Adelaide', venue: 'Marvel', home: true, start: '2027-07-26T12:00:00+10:00', tbc: true },
+      { round: 'R21', date: 'Week of Aug 2', time: '', opponent: 'Collingwood', venue: 'MCG', home: false, start: '2027-08-02T12:00:00+10:00', tbc: true },
+      { round: 'R22', date: 'Week of Aug 9', time: '', opponent: 'Sydney', venue: 'SCG', home: false, start: '2027-08-09T12:00:00+10:00', tbc: true },
+      { round: 'R23', date: 'Week of Aug 16', time: '', opponent: 'Port Adelaide', venue: 'MCG', home: true, start: '2027-08-16T12:00:00+10:00', tbc: true },
+      { round: 'R24', date: 'Week of Aug 23', time: '', opponent: 'GWS', venue: 'Marvel', home: true, start: '2027-08-23T12:00:00+10:00', tbc: true },
+    ];
     const RESULTS_2027 = {};
     const MATCH_STATS_2027 = {};
 
