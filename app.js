@@ -3945,7 +3945,10 @@ const connectSync = async rawToken => {
 // Pull, merge, push if anything's new. `cur` is the on-screen season's live { votes, stamps };
 // other seasons merge straight into localStorage. Returns the merged cells for `cur`.
 // Unstamped ties go to the gist, so set up the device holding the real votes first.
-const syncVotes = async cur => {
+// `year` is the season the calling screen shows, fixed when it opened. Never read S_YEAR after
+// an await: switching seasons mid-sync changes it, and the votes on screen would be saved under
+// the new season (that copied all 2026 votes into 2027 in Nov 2026).
+const syncVotes = async (cur, year) => {
   const cfg = loadSync();
   if (!cfg) return null;
   const gist = await ghFetch(cfg.token, `/gists/${cfg.gistId}`);
@@ -3962,7 +3965,7 @@ const syncVotes = async cur => {
   let dirty = false,
     curCells = null;
   Object.keys(SEASONS).forEach(y => {
-    const here = String(S_YEAR) === y;
+    const here = String(year) === y;
     const local = dropBefore(here ? toCells(cur.votes, cur.stamps) : toCells(loadJSON(`carlton-bf-${y}`), loadJSON(stampsKey(y))), resets[y]);
     const merged = mergeCells(local, remote[y]);
     if (stableJSON(merged) !== stableJSON(remote[y] || {})) dirty = true;
@@ -4008,7 +4011,7 @@ const syncVotes = async cur => {
   };
   return {
     cells: curCells,
-    reset: resets[String(S_YEAR)]
+    reset: resets[String(year)]
   };
 };
 // The gist as of the last sync. When the app is put away with votes not yet sent, there's no
@@ -4028,7 +4031,8 @@ const useVoteSync = (votes, setVotes, onPulled) => {
       last: c.last
     } : null;
   });
-  const stamps = useRef(loadJSON(stampsKey(S_YEAR)));
+  const year = useRef(S_YEAR).current;
+  const stamps = useRef(loadJSON(stampsKey(year)));
   const prev = useRef(votes);
   const live = useRef(votes);
   live.current = votes;
@@ -4068,7 +4072,7 @@ const useVoteSync = (votes, setVotes, onPulled) => {
       } = await syncVotes({
         votes: live.current,
         stamps: stamps.current
-      });
+      }, year);
       // Votes made while that request was out are newer than anything it brought back
       const {
         votes: nv,
@@ -4076,7 +4080,7 @@ const useVoteSync = (votes, setVotes, onPulled) => {
       } = fromCells(mergeCells(merged, dropBefore(toCells(live.current, stamps.current), reset), true));
       stamps.current = ns;
       try {
-        localStorage.setItem(stampsKey(S_YEAR), JSON.stringify(ns));
+        localStorage.setItem(stampsKey(year), JSON.stringify(ns));
       } catch {}
       if (stableJSON(nv) !== stableJSON(fromCells(toCells(live.current, {})).votes)) {
         fromSync.current = true;
@@ -4131,7 +4135,7 @@ const useVoteSync = (votes, setVotes, onPulled) => {
       ...lastDoc.seasons
     };
     Object.keys(SEASONS).forEach(y => {
-      const here = String(S_YEAR) === y;
+      const here = String(year) === y;
       const local = dropBefore(here ? toCells(live.current, stamps.current) : toCells(loadJSON(`carlton-bf-${y}`), loadJSON(stampsKey(y))), lastDoc.resets[y]);
       seasons[y] = mergeCells(local, lastDoc.seasons[y]);
     });
@@ -4178,7 +4182,7 @@ const useVoteSync = (votes, setVotes, onPulled) => {
     if (before === votes) return;
     if (stampChanges(before, votes, stamps.current, Date.now())) {
       try {
-        localStorage.setItem(stampsKey(S_YEAR), JSON.stringify(stamps.current));
+        localStorage.setItem(stampsKey(year), JSON.stringify(stamps.current));
       } catch {}
       if (loadSync()) {
         clearTimeout(timer.current);
@@ -4230,7 +4234,7 @@ const useVoteSync = (votes, setVotes, onPulled) => {
       state: 'syncing'
     }));
     try {
-      const y = String(S_YEAR);
+      const y = String(year);
       const gist = await ghFetch(cfg.token, `/gists/${cfg.gistId}`);
       let remote = {},
         resets = {};
@@ -4318,7 +4322,7 @@ const useVoteSync = (votes, setVotes, onPulled) => {
       state: 'syncing'
     }));
     try {
-      const y = String(S_YEAR);
+      const y = String(year);
       const gist = await ghFetch(cfg.token, `/gists/${cfg.gistId}`);
       const doc = JSON.parse(gist.files[SYNC_FILE].content);
       doc.resets = {

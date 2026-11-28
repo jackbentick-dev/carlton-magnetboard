@@ -2444,7 +2444,10 @@
     // Pull, merge, push if anything's new. `cur` is the on-screen season's live { votes, stamps };
     // other seasons merge straight into localStorage. Returns the merged cells for `cur`.
     // Unstamped ties go to the gist, so set up the device holding the real votes first.
-    const syncVotes = async (cur) => {
+    // `year` is the season the calling screen shows, fixed when it opened. Never read S_YEAR after
+    // an await: switching seasons mid-sync changes it, and the votes on screen would be saved under
+    // the new season (that copied all 2026 votes into 2027 in Nov 2026).
+    const syncVotes = async (cur, year) => {
       const cfg = loadSync();
       if (!cfg) return null;
       const gist = await ghFetch(cfg.token, `/gists/${cfg.gistId}`);
@@ -2457,7 +2460,7 @@
       const seasons = { ...remote };
       let dirty = false, curCells = null;
       Object.keys(SEASONS).forEach(y => {
-        const here = String(S_YEAR) === y;
+        const here = String(year) === y;
         const local = dropBefore(here ? toCells(cur.votes, cur.stamps) : toCells(loadJSON(`carlton-bf-${y}`), loadJSON(stampsKey(y))), resets[y]);
         const merged = mergeCells(local, remote[y]);
         if (stableJSON(merged) !== stableJSON(remote[y] || {})) dirty = true;
@@ -2476,7 +2479,7 @@
       }
       saveSync({ ...loadSync(), last: Date.now() });
       lastDoc = { seasons, resets };
-      return { cells: curCells, reset: resets[String(S_YEAR)] };
+      return { cells: curCells, reset: resets[String(year)] };
     };
     // The gist as of the last sync. When the app is put away with votes not yet sent, there's no
     // time for a fresh read, so they're merged onto this and sent in one go (see flush below).
@@ -2490,7 +2493,8 @@
     // that isn't an error. `onPulled(n)` is told when votes arrive from another device.
     const useVoteSync = (votes, setVotes, onPulled) => {
       const [status, setStatus] = useState(() => { const c = loadSync(); return c ? { state: 'idle', last: c.last } : null; });
-      const stamps = useRef(loadJSON(stampsKey(S_YEAR)));
+      const year = useRef(S_YEAR).current;
+      const stamps = useRef(loadJSON(stampsKey(year)));
       const prev = useRef(votes);
       const live = useRef(votes);
       live.current = votes;
@@ -2512,11 +2516,11 @@
         setStatus(s => ({ ...(s || {}), state: 'syncing' }));
         try {
           const before = live.current;
-          const { cells: merged, reset } = await syncVotes({ votes: live.current, stamps: stamps.current });
+          const { cells: merged, reset } = await syncVotes({ votes: live.current, stamps: stamps.current }, year);
           // Votes made while that request was out are newer than anything it brought back
           const { votes: nv, stamps: ns } = fromCells(mergeCells(merged, dropBefore(toCells(live.current, stamps.current), reset), true));
           stamps.current = ns;
-          try { localStorage.setItem(stampsKey(S_YEAR), JSON.stringify(ns)); } catch {}
+          try { localStorage.setItem(stampsKey(year), JSON.stringify(ns)); } catch {}
           if (stableJSON(nv) !== stableJSON(fromCells(toCells(live.current, {})).votes)) {
             fromSync.current = true;
             setVotes(nv);
@@ -2551,7 +2555,7 @@
         if (!lastDoc) { runRef.current(); return; }
         const seasons = { ...lastDoc.seasons };
         Object.keys(SEASONS).forEach(y => {
-          const here = String(S_YEAR) === y;
+          const here = String(year) === y;
           const local = dropBefore(here ? toCells(live.current, stamps.current) : toCells(loadJSON(`carlton-bf-${y}`), loadJSON(stampsKey(y))), lastDoc.resets[y]);
           seasons[y] = mergeCells(local, lastDoc.seasons[y]);
         });
@@ -2569,7 +2573,7 @@
         if (fromSync.current) { fromSync.current = false; return; }
         if (before === votes) return;
         if (stampChanges(before, votes, stamps.current, Date.now())) {
-          try { localStorage.setItem(stampsKey(S_YEAR), JSON.stringify(stamps.current)); } catch {}
+          try { localStorage.setItem(stampsKey(year), JSON.stringify(stamps.current)); } catch {}
           if (loadSync()) { clearTimeout(timer.current); timer.current = setTimeout(() => runRef.current(), 600); }
         }
       }, [votes]);
@@ -2607,7 +2611,7 @@
         clearTimeout(timer.current);
         setStatus(s => ({ ...(s || {}), state: 'syncing' }));
         try {
-          const y = String(S_YEAR);
+          const y = String(year);
           const gist = await ghFetch(cfg.token, `/gists/${cfg.gistId}`);
           let remote = {}, resets = {};
           try {
@@ -2647,7 +2651,7 @@
         busy.current = true;
         setStatus(s => ({ ...(s || {}), state: 'syncing' }));
         try {
-          const y = String(S_YEAR);
+          const y = String(year);
           const gist = await ghFetch(cfg.token, `/gists/${cfg.gistId}`);
           const doc = JSON.parse(gist.files[SYNC_FILE].content);
           doc.resets = { ...(doc.resets || {}), [y]: Math.max(Date.now(), (doc.resets || {})[y] || 0) };
